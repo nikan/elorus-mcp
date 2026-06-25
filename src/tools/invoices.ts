@@ -242,4 +242,68 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
       };
     }
   );
+
+  server.registerTool(
+    "void_invoice",
+    {
+      description: "Void an invoice. A voided invoice cannot be edited or paid and is excluded from financial reports.",
+      inputSchema: {
+        id: z.string().describe("The Elorus invoice ID to void"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.post(`/invoices/${id}/void/`, {});
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "send_invoice_email",
+    {
+      description: "Email an invoice to the client. Uses the organization's default email template unless overridden.",
+      inputSchema: {
+        id: z.string().describe("The Elorus invoice ID to send"),
+        to: z
+          .array(z.string().email())
+          .min(1)
+          .describe("Recipient email addresses"),
+        subject: z
+          .string()
+          .optional()
+          .describe("Email subject line (uses default template if omitted)"),
+        message: z
+          .string()
+          .optional()
+          .describe("Email body text (uses default template if omitted)"),
+        cc: z
+          .array(z.string().email())
+          .optional()
+          .describe("CC email addresses"),
+      },
+    },
+    async ({ id, ...body }) => {
+      const result = await client.post(`/invoices/${id}/sendmail/`, body);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "export_invoice_pdf",
+    {
+      description: "Export an invoice as a PDF. Returns a download URL for the generated PDF file.",
+      inputSchema: {
+        id: z.string().describe("The Elorus invoice ID to export"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.get(`/invoices/${id}/pdf/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
 }
