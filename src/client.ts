@@ -80,7 +80,11 @@ export function formatDrfError(body: unknown): string {
   if (typeof body === "string") return body;
 
   if (Array.isArray(body)) {
-    return body.map(String).join("; ");
+    return body
+      .map((item) =>
+        item !== null && typeof item === "object" ? formatDrfError(item) : String(item)
+      )
+      .join("; ");
   }
 
   if (body && typeof body === "object") {

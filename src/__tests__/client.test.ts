@@ -182,6 +182,12 @@ describe("formatDrfError", () => {
     expect(formatDrfError(["Error one.", "Error two."])).toBe("Error one.; Error two.");
   });
 
+  it("handles array of objects (nested serializer errors)", () => {
+    const result = formatDrfError([{ unit_value: ["This field is required."] }]);
+    expect(result).toContain("unit_value: This field is required.");
+    expect(result).not.toContain("[object Object]");
+  });
+
   it("handles per-field errors", () => {
     const result = formatDrfError({ client: ["Required."], date: ["Invalid date."] });
     expect(result).toContain("client: Required.");
