@@ -1,0 +1,31 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "2000000001",
+      "client": "1000000001",
+      "date": "2026-06-01",
+      "due_date": "2026-07-01",
+      "status": "sent",
+      "documenttype": "3000000001",
+      "currency_code": "EUR",
+      "exchange_rate": "1.000000",
+      "total": "1240.00",
+      "subtotal": "1000.00",
+      "total_taxes": "240.00",
+      "draft": false,
+      "items": [
+        {
+          "title": "Consulting services",
+          "quantity": "10.00",
+          "unit_value": "100.00",
+          "unit_total": "124.00",
+          "taxes": ["4000000001"],
+          "discount": "0.00"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+src/
+vitest.config.ts
+tsconfig.json
+plan.md
+*.tsbuildinfo

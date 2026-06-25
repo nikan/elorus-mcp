@@ -1,0 +1,41 @@
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "1000000001",
+      "company": "Acme Corp",
+      "first_name": "",
+      "last_name": "",
+      "client_type": "1",
+      "is_client": true,
+      "is_supplier": false,
+      "vat_number": "EL123456789",
+      "email": "billing@acme.com",
+      "phone": "+30 21 0000 0001",
+      "addresses": [
+        {
+          "address": "123 Main St",
+          "city": "Athens",
+          "zip": "10431",
+          "country": "GR",
+          "ad_type": "bill"
+        }
+      ]
+    },
+    {
+      "id": "1000000002",
+      "company": "",
+      "first_name": "Maria",
+      "last_name": "Papadopoulos",
+      "client_type": "2",
+      "is_client": true,
+      "is_supplier": true,
+      "vat_number": "",
+      "email": "maria@example.com",
+      "phone": "+30 69 0000 0002",
+      "addresses": []
+    }
+  ]
+}

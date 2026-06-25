@@ -1,18 +1,33 @@
 {
   "name": "elorus-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "MCP server for the Elorus invoicing and accounting platform",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "elorus-mcp": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": ["mcp", "elorus", "invoicing", "accounting"],
+  "keywords": [
+    "mcp",
+    "elorus",
+    "invoicing",
+    "accounting",
+    "claude"
+  ],
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -20,7 +35,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "@vitest/coverage-v8": "^4.1.9",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=20"
