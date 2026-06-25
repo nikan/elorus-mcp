@@ -31,6 +31,13 @@ const lineItemSchema = z
         message: "Each line item requires either unit_value or unit_total",
       });
     }
+    if (item.unit_value && item.unit_total) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["unit_value"],
+        message: "Provide unit_value or unit_total, not both — choose the one that matches calculator_mode",
+      });
+    }
   });
 
 export function registerSupplierCreditTools(server: McpServer, client: ElorusClient): void {
