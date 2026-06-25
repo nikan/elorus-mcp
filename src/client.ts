@@ -56,11 +56,11 @@ export class ElorusClient {
       let details = response.statusText;
       try {
         const body = await response.json();
-        details = JSON.stringify(body);
+        details = formatDrfError(body);
       } catch {
         // use statusText
       }
-      throw new Error(formatError(response.status, details));
+      throw new Error(formatHttpError(response.status, details));
     }
     if (response.status === 204) {
       return {} as T;
@@ -69,7 +69,44 @@ export class ElorusClient {
   }
 }
 
-function formatError(status: number, details: string): string {
+/**
+ * Converts a Django REST Framework error body into a human-readable string.
+ * DRF produces three shapes:
+ *   {"detail": "string"}          — single top-level message
+ *   {"field": ["msg", ...], ...}  — per-field validation errors
+ *   ["msg", ...]                  — non-field errors list
+ */
+export function formatDrfError(body: unknown): string {
+  if (typeof body === "string") return body;
+
+  if (Array.isArray(body)) {
+    return body.map(String).join("; ");
+  }
+
+  if (body && typeof body === "object") {
+    const obj = body as Record<string, unknown>;
+
+    if (typeof obj["detail"] === "string") {
+      return obj["detail"];
+    }
+
+    const parts: string[] = [];
+    for (const [field, messages] of Object.entries(obj)) {
+      if (Array.isArray(messages)) {
+        parts.push(`${field}: ${messages.join(", ")}`);
+      } else if (typeof messages === "string") {
+        parts.push(`${field}: ${messages}`);
+      } else if (messages && typeof messages === "object") {
+        parts.push(`${field}: ${formatDrfError(messages)}`);
+      }
+    }
+    if (parts.length > 0) return parts.join("; ");
+  }
+
+  return JSON.stringify(body);
+}
+
+export function formatHttpError(status: number, details: string): string {
   const labels: Record<number, string> = {
     400: "Bad request",
     401: "Unauthorized — check ELORUS_API_KEY",
