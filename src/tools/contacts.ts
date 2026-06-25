@@ -130,4 +130,29 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
       };
     }
   );
+
+  server.registerTool(
+    "update_contact",
+    {
+      description: "Update fields on an existing contact. Only provided fields are changed (PATCH semantics).",
+      inputSchema: {
+        id: z.string().describe("The Elorus contact ID to update"),
+        company: z.string().optional().describe("Company name"),
+        first_name: z.string().optional().describe("First name"),
+        last_name: z.string().optional().describe("Last name"),
+        is_client: z.boolean().optional().describe("Mark as client"),
+        is_supplier: z.boolean().optional().describe("Mark as supplier"),
+        vat_number: z.string().optional().describe("VAT / tax registration number"),
+        email: z.string().email().optional().describe("Primary email address"),
+        phone: z.string().optional().describe("Primary phone number"),
+        notes: z.string().optional().describe("Internal notes"),
+      },
+    },
+    async ({ id, ...fields }) => {
+      const result = await client.patch(`/contacts/${id}/`, fields);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
 }

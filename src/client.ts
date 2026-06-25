@@ -62,6 +62,9 @@ export class ElorusClient {
       }
       throw new Error(formatError(response.status, details));
     }
+    if (response.status === 204) {
+      return {} as T;
+    }
     return response.json() as Promise<T>;
   }
 }

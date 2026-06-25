@@ -101,4 +101,28 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
       };
     }
   );
+
+  server.registerTool(
+    "update_product",
+    {
+      description: "Update fields on an existing product or service. Only provided fields are changed (PATCH semantics).",
+      inputSchema: {
+        id: z.string().describe("The Elorus product ID to update"),
+        title: z.string().optional().describe("Product or service name"),
+        description: z.string().optional().describe("Detailed description"),
+        code: z.string().optional().describe("Product code or SKU"),
+        sale_price: z.string().optional().describe("Default selling price before tax, e.g. '99.99'"),
+        purchase_price: z.string().optional().describe("Default purchase/cost price before tax, e.g. '60.00'"),
+        taxes: z.array(z.string()).optional().describe("Array of tax IDs (obtain via list_taxes)"),
+        unit: z.string().optional().describe("Unit of measurement ID (obtain from list_units)"),
+        notes: z.string().optional().describe("Internal notes"),
+      },
+    },
+    async ({ id, ...fields }) => {
+      const result = await client.patch(`/products/${id}/`, fields);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
 }
