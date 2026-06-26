@@ -17,7 +17,7 @@ import { registerNoteTools } from "./tools/notes.js";
 import { registerResources } from "./resources/index.js";
 
 const config = getConfig();
-const client = new ElorusClient(config.apiKey, config.orgId);
+const client = new ElorusClient(config.apiKey, config.orgId, config.demo);
 
 const server = new McpServer({
   name: "elorus-mcp",

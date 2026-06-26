@@ -11,13 +11,16 @@ export class ElorusClient {
   private readonly baseUrl = "https://api.elorus.com/v1.2";
   private readonly headers: Record<string, string>;
 
-  constructor(apiKey: string, orgId: string) {
+  constructor(apiKey: string, orgId: string, demo = false) {
     this.headers = {
       Authorization: `Token ${apiKey}`,
       "X-Elorus-Organization": orgId,
       "Content-Type": "application/json",
       Accept: "application/json",
     };
+    if (demo) {
+      this.headers["X-Elorus-Demo"] = "1";
+    }
   }
 
   async get<T>(path: string, params?: QueryParams): Promise<T> {

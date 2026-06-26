@@ -1,6 +1,7 @@
 export interface ElorusConfig {
   apiKey: string;
   orgId: string;
+  demo: boolean;
 }
 
 export function getConfig(): ElorusConfig {
@@ -14,5 +15,5 @@ export function getConfig(): ElorusConfig {
     throw new Error("ELORUS_ORG_ID environment variable is required");
   }
 
-  return { apiKey, orgId };
+  return { apiKey, orgId, demo: process.env.ELORUS_DEMO === "1" };
 }
