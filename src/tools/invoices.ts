@@ -103,90 +103,83 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
     {
       description:
         "Create a new sales invoice. Monetary values must be strings (e.g. '1500.00') to avoid floating-point issues. Use list_taxes and list_document_types to obtain valid IDs before calling this tool.",
-      inputSchema: z
-        .object({
-          client: z
-            .string()
-            .describe("Contact ID of the client being invoiced"),
-          date: z
-            .string()
-            .describe("Invoice issue date in YYYY-MM-DD format"),
-          documenttype: z
-            .string()
-            .describe(
-              "Document type ID (obtain from list_document_types). Required for correct accounting and myDATA classification."
-            ),
-          items: z
-            .array(lineItemSchema)
-            .min(1)
-            .describe("Line items on this invoice (at least one required)"),
-          calculator_mode: z
-            .enum(["initial", "total"])
-            .optional()
-            .default("initial")
-            .describe(
-              "'initial' means each item must have unit_value (price before tax); 'total' means each item must have unit_total (price after tax)"
-            ),
-          currency_code: z
-            .string()
-            .length(3)
-            .optional()
-            .describe("ISO 4217 currency code, e.g. 'EUR', 'USD' (default: organization currency)"),
-          exchange_rate: z
-            .string()
-            .optional()
-            .describe(
-              "Exchange rate to organization base currency as a string, e.g. '1.000000'"
-            ),
-          due_date: z
-            .string()
-            .optional()
-            .describe("Payment due date in YYYY-MM-DD format"),
-          draft: z
-            .boolean()
-            .optional()
-            .describe(
-              "Set true to save as draft without finalizing or submitting to tax authority"
-            ),
-          paid_on_receipt: z
-            .string()
-            .optional()
-            .describe("Amount paid immediately upon issue as a string, e.g. '0.00'"),
-          payment_method: z
-            .enum(["1", "2", "3", "4", "5", "6", "7"])
-            .optional()
-            .describe(
-              "Payment method: 1=bank account, 2=cash, 3=cheque, 4=web banking, 5=POS, 6=PayPal, 7=other"
-            ),
-          notes: z.string().optional().describe("Internal or external notes on the invoice"),
-          mydata_document_type: z
-            .string()
-            .optional()
-            .describe(
-              "AADE myDATA document type code (e.g. '1.1' for domestic sales invoice). Required for Greek organizations."
-            ),
-        })
-        .superRefine((data, ctx) => {
-          const mode = data.calculator_mode;
-          data.items.forEach((item, i) => {
-            if (mode === "initial" && !item.unit_value) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["items", i, "unit_value"],
-                message: "calculator_mode 'initial' requires unit_value (price before tax) on each line item",
-              });
-            }
-            if (mode === "total" && !item.unit_total) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["items", i, "unit_total"],
-                message: "calculator_mode 'total' requires unit_total (price after tax) on each line item",
-              });
-            }
-          });
-        }),
+      inputSchema: {
+        client: z
+          .string()
+          .describe("Contact ID of the client being invoiced"),
+        date: z
+          .string()
+          .describe("Invoice issue date in YYYY-MM-DD format"),
+        documenttype: z
+          .string()
+          .describe(
+            "Document type ID (obtain from list_document_types). Required for correct accounting and myDATA classification."
+          ),
+        items: z
+          .array(lineItemSchema)
+          .min(1)
+          .describe("Line items on this invoice (at least one required)"),
+        calculator_mode: z
+          .enum(["initial", "total"])
+          .optional()
+          .default("initial")
+          .describe(
+            "'initial' means each item must have unit_value (price before tax); 'total' means each item must have unit_total (price after tax)"
+          ),
+        currency_code: z
+          .string()
+          .length(3)
+          .optional()
+          .describe("ISO 4217 currency code, e.g. 'EUR', 'USD' (default: organization currency)"),
+        exchange_rate: z
+          .string()
+          .optional()
+          .describe(
+            "Exchange rate to organization base currency as a string, e.g. '1.000000'"
+          ),
+        due_date: z
+          .string()
+          .optional()
+          .describe("Payment due date in YYYY-MM-DD format"),
+        draft: z
+          .boolean()
+          .optional()
+          .describe(
+            "Set true to save as draft without finalizing or submitting to tax authority"
+          ),
+        paid_on_receipt: z
+          .string()
+          .optional()
+          .describe("Amount paid immediately upon issue as a string, e.g. '0.00'"),
+        payment_method: z
+          .enum(["1", "2", "3", "4", "5", "6", "7"])
+          .optional()
+          .describe(
+            "Payment method: 1=bank account, 2=cash, 3=cheque, 4=web banking, 5=POS, 6=PayPal, 7=other"
+          ),
+        notes: z.string().optional().describe("Internal or external notes on the invoice"),
+        mydata_document_type: z
+          .string()
+          .optional()
+          .describe(
+            "AADE myDATA document type code (e.g. '1.1' for domestic sales invoice). Required for Greek organizations."
+          ),
+      },
     },
     async (args) => {
+      const mode = args.calculator_mode ?? "initial";
+      args.items.forEach((item, i) => {
+        if (mode === "initial" && !item.unit_value) {
+          throw new Error(
+            `items[${i}]: calculator_mode 'initial' requires unit_value (price before tax) on each line item`
+          );
+        }
+        if (mode === "total" && !item.unit_total) {
+          throw new Error(
+            `items[${i}]: calculator_mode 'total' requires unit_total (price after tax) on each line item`
+          );
+        }
+      });
       const result = await client.post("/invoices/", args);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

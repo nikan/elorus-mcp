@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { lineItemSchema as expenseLineItemSchema } from "../schemas/line-item.js";
+import { expenseLineItemSchema } from "../schemas/expense-line-item.js";
 
 export function registerExpenseTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -79,61 +79,37 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description:
         "Record a new business expense. Use list_taxes, list_document_types, and list_expense_categories to obtain valid IDs before calling this tool.",
-      inputSchema: z
-        .object({
-          date: z.string().describe("Expense date in YYYY-MM-DD format"),
-          documenttype: z
-            .string()
-            .describe("Document type ID (obtain from list_document_types)"),
-          items: z
-            .array(expenseLineItemSchema)
-            .min(1)
-            .describe("Line items on this expense (at least one required)"),
-          calculator_mode: z
-            .enum(["initial", "total"])
-            .optional()
-            .default("initial")
-            .describe(
-              "'initial': each item must have unit_value (pre-tax); 'total': each item must have unit_total (post-tax)"
-            ),
-          supplier: z
-            .string()
-            .optional()
-            .describe("Contact ID of the supplier (for expenses tied to a specific supplier)"),
-          expense_category: z
-            .string()
-            .optional()
-            .describe("Expense category ID (obtain from list_expense_categories)"),
-          currency_code: z
-            .string()
-            .length(3)
-            .optional()
-            .describe("ISO 4217 currency code, e.g. 'EUR'"),
-          exchange_rate: z
-            .string()
-            .optional()
-            .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
-          notes: z.string().optional().describe("Internal notes"),
-        })
-        .superRefine((data, ctx) => {
-          const mode = data.calculator_mode;
-          data.items.forEach((item, i) => {
-            if (mode === "initial" && !item.unit_value) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["items", i, "unit_value"],
-                message: "calculator_mode 'initial' requires unit_value on each line item",
-              });
-            }
-            if (mode === "total" && !item.unit_total) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["items", i, "unit_total"],
-                message: "calculator_mode 'total' requires unit_total on each line item",
-              });
-            }
-          });
-        }),
+      inputSchema: {
+        date: z.string().describe("Expense date in YYYY-MM-DD format"),
+        documenttype: z
+          .string()
+          .describe("Document type ID (obtain from list_document_types)"),
+        items: z
+          .array(expenseLineItemSchema)
+          .min(1)
+          .describe("Line items on this expense (at least one required)"),
+        calculator_mode: z
+          .enum(["initial", "total"])
+          .optional()
+          .default("initial")
+          .describe(
+            "'initial': each item must have unit_value (pre-tax); 'total': each item must have unit_total (post-tax)"
+          ),
+        supplier: z
+          .string()
+          .optional()
+          .describe("Contact ID of the supplier (for expenses tied to a specific supplier)"),
+        currency_code: z
+          .string()
+          .length(3)
+          .optional()
+          .describe("ISO 4217 currency code, e.g. 'EUR'"),
+        exchange_rate: z
+          .string()
+          .optional()
+          .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
+        notes: z.string().optional().describe("Internal notes"),
+      },
     },
     async (args) => {
       const result = await client.post("/expenses/", args);
