@@ -53,56 +53,49 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
     {
       description:
         "Create a credit note to reduce or cancel an amount owed by a client. Use list_taxes and list_document_types to obtain valid IDs before calling this tool.",
-      inputSchema: z
-        .object({
-          client: z.string().describe("Contact ID of the client"),
-          date: z.string().describe("Credit note issue date in YYYY-MM-DD format"),
-          documenttype: z
-            .string()
-            .describe("Document type ID (obtain from list_document_types)"),
-          items: z
-            .array(lineItemSchema)
-            .min(1)
-            .describe("Line items on this credit note (at least one required)"),
-          calculator_mode: z
-            .enum(["initial", "total"])
-            .optional()
-            .default("initial")
-            .describe(
-              "'initial': each item must have unit_value (pre-tax); 'total': each item must have unit_total (post-tax)"
-            ),
-          currency_code: z
-            .string()
-            .length(3)
-            .optional()
-            .describe("ISO 4217 currency code, e.g. 'EUR'"),
-          exchange_rate: z
-            .string()
-            .optional()
-            .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
-          notes: z.string().optional().describe("Internal or external notes"),
-        })
-        .superRefine((data, ctx) => {
-          const mode = data.calculator_mode;
-          data.items.forEach((item, i) => {
-            if (mode === "initial" && !item.unit_value) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["items", i, "unit_value"],
-                message: "calculator_mode 'initial' requires unit_value on each line item",
-              });
-            }
-            if (mode === "total" && !item.unit_total) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["items", i, "unit_total"],
-                message: "calculator_mode 'total' requires unit_total on each line item",
-              });
-            }
-          });
-        }),
+      inputSchema: {
+        client: z.string().describe("Contact ID of the client"),
+        date: z.string().describe("Credit note issue date in YYYY-MM-DD format"),
+        documenttype: z
+          .string()
+          .describe("Document type ID (obtain from list_document_types)"),
+        items: z
+          .array(lineItemSchema)
+          .min(1)
+          .describe("Line items on this credit note (at least one required)"),
+        calculator_mode: z
+          .enum(["initial", "total"])
+          .optional()
+          .default("initial")
+          .describe(
+            "'initial': each item must have unit_value (pre-tax); 'total': each item must have unit_total (post-tax)"
+          ),
+        currency_code: z
+          .string()
+          .length(3)
+          .optional()
+          .describe("ISO 4217 currency code, e.g. 'EUR'"),
+        exchange_rate: z
+          .string()
+          .optional()
+          .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
+        notes: z.string().optional().describe("Internal or external notes"),
+      },
     },
     async (args) => {
+      const mode = args.calculator_mode ?? "initial";
+      args.items.forEach((item, i) => {
+        if (mode === "initial" && !item.unit_value) {
+          throw new Error(
+            `items[${i}]: calculator_mode 'initial' requires unit_value on each line item`
+          );
+        }
+        if (mode === "total" && !item.unit_total) {
+          throw new Error(
+            `items[${i}]: calculator_mode 'total' requires unit_total on each line item`
+          );
+        }
+      });
       const result = await client.post("/creditnotes/", args);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

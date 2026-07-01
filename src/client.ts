@@ -100,7 +100,7 @@ export function formatDrfError(body: unknown): string {
     const parts: string[] = [];
     for (const [field, messages] of Object.entries(obj)) {
       if (Array.isArray(messages)) {
-        parts.push(`${field}: ${messages.join(", ")}`);
+        parts.push(`${field}: ${formatDrfError(messages)}`);
       } else if (typeof messages === "string") {
         parts.push(`${field}: ${messages}`);
       } else if (messages && typeof messages === "object") {
