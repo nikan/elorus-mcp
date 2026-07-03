@@ -167,6 +167,12 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         date: z.string().optional().describe("Bill issue date in YYYY-MM-DD format"),
         due_date: z.string().optional().describe("Payment due date in YYYY-MM-DD format"),
         notes: z.string().optional().describe("Internal notes"),
+        draft: z
+          .boolean()
+          .optional()
+          .describe(
+            "Set false to issue a draft bill (required before a payment can be attached to it), or true to revert an unpaid bill back to draft"
+          ),
       },
     },
     async ({ id, ...fields }) => {

@@ -134,6 +134,7 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 |---|---|
 | `list_cash_payments` | Filter by supplier, bill, or date range |
 | `record_cash_payment` | Record a payment made to a supplier, optionally linked to a bill |
+| `delete_cash_payment` | Permanently delete a payment made to a supplier |
 
 ### Products
 | Tool | Description |

@@ -79,10 +79,35 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
         notes: z.string().optional().describe("Internal notes about this payment"),
       },
     },
-    async (args) => {
-      const result = await client.post("/cashpayments/", args);
+    async ({ supplier, bill, amount, ...rest }) => {
+      const result = await client.post("/cashpayments/", {
+        ...rest,
+        amount,
+        contact: supplier,
+        transaction_type: "ip",
+        purchase_payments: bill ? [{ purchase: bill, amount }] : [],
+      });
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "delete_cash_payment",
+    {
+      description:
+        "Permanently delete a payment made to a supplier. If the payment is linked to a bill, " +
+        "the bill's paid amount is reduced accordingly; a fully-paid bill with no remaining " +
+        "payments can then be reverted to draft via update_bill. This is a hard delete with no undo.",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash payment ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/cashpayments/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
       };
     }
   );
