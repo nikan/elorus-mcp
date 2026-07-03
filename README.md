@@ -105,6 +105,7 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `get_expense` | Fetch an expense by ID |
 | `create_expense` | Record a new business expense. Line items use `expense_category`/`amount`/`description` (not the invoice-style `title`/`quantity`/`unit_value`) |
 | `update_expense` | Update fields on an existing expense |
+| `add_expense_attachment` | Attach a file (e.g. a receipt or supplier invoice PDF) to an existing expense, given base64-encoded content |
 | `export_expense_pdf` | Export an expense document as a PDF (returns a download URL) |
 
 ### Credit notes (issued to clients)
