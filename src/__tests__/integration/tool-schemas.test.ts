@@ -157,6 +157,36 @@ describe("create_expense request shape (through the real tool-call path)", () =>
     expect(Array.isArray(body.items)).toBe(true);
   });
 
+  it("converts item.taxes from an array of tax IDs to the {tax, auto_calculate} shape the API expects", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = mockPostCapture({
+      id: "3573038505774810569",
+      date: "2026-07-15",
+      items: [{ expense_category: "cat-1", amount: "100.00" }],
+    });
+
+    const result = await client.callTool({
+      name: "create_expense",
+      arguments: {
+        date: "2026-07-15",
+        documenttype: "doctype-1",
+        items: [{ expense_category: "cat-1", amount: "100.00", taxes: ["tax-1"] }],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(options.body as string);
+    expect(body.items).toEqual([
+      {
+        expense_category: "cat-1",
+        amount: "100.00",
+        taxes: [{ tax: "tax-1", auto_calculate: true }],
+      },
+    ]);
+  });
+
   it("rejects an item missing amount when calculator_mode is 'initial' without ever reaching the API", async () => {
     const client = await connectedClient(elorusClient);
     const mockFetch = mockPostCapture();

@@ -111,8 +111,15 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
         notes: z.string().optional().describe("Internal notes"),
       },
     },
-    async (args) => {
-      const result = await client.post("/expenses/", args);
+    async ({ items, ...rest }) => {
+      const body = {
+        ...rest,
+        items: items.map(({ taxes, ...item }) => ({
+          ...item,
+          taxes: taxes?.map((tax) => ({ tax, auto_calculate: true })),
+        })),
+      };
+      const result = await client.post("/expenses/", body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
