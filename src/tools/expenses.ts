@@ -134,6 +134,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe("Expense category ID (obtain from list_expense_categories)"),
         notes: z.string().optional().describe("Internal notes"),
+        reference: z.string().optional().describe("Reference number or identifier for this expense"),
       },
     },
     async ({ id, ...fields }) => {
