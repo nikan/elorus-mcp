@@ -204,3 +204,33 @@ describe("create_expense request shape (through the real tool-call path)", () =>
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+describe("delete_expense", () => {
+  const elorusClient = new ElorusClient("fixture-key", "fixture-org");
+
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("DELETEs the expense at /expenses/{id}/", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await client.callTool({
+      name: "delete_expense",
+      arguments: { id: "exp-1" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/expenses/exp-1/");
+    expect(options.method).toBe("DELETE");
+  });
+});

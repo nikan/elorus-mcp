@@ -153,6 +153,25 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
   );
 
   server.registerTool(
+    "delete_expense",
+    {
+      description:
+        "Permanently delete an expense record. Unlike invoices/bills, expenses have no void " +
+        "state — this is a hard delete with no undo, so confirm the ID is correct first (e.g. " +
+        "via get_expense).",
+      inputSchema: {
+        id: z.string().describe("The Elorus expense ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/expenses/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
     "add_expense_attachment",
     {
       description:

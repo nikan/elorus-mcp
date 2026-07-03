@@ -79,6 +79,14 @@ export class ElorusClient {
     return this.handleResponse<T>(response);
   }
 
+  async delete<T>(path: string): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "DELETE",
+      headers: this.headers,
+    });
+    return this.handleResponse<T>(response);
+  }
+
   /**
    * Elorus doesn't support PATCH on every resource (expenses, contacts, products
    * only accept PUT, which requires the full representation — e.g. expenses reject
