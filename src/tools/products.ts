@@ -105,7 +105,9 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
   server.registerTool(
     "update_product",
     {
-      description: "Update fields on an existing product or service. Only provided fields are changed (PATCH semantics).",
+      description:
+        "Update fields on an existing product or service. Only provided fields are changed (PATCH semantics); " +
+        "the Elorus API only supports PUT on products, so this fetches the current record and merges your fields into it before saving.",
       inputSchema: {
         id: z.string().describe("The Elorus product ID to update"),
         title: z.string().optional().describe("Product or service name"),
@@ -119,7 +121,7 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
       },
     },
     async ({ id, ...fields }) => {
-      const result = await client.patch(`/products/${id}/`, fields);
+      const result = await client.mergePut(`/products/${id}/`, fields);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

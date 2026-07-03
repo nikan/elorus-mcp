@@ -128,7 +128,9 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
   server.registerTool(
     "update_contact",
     {
-      description: "Update fields on an existing contact. Only provided fields are changed (PATCH semantics).",
+      description:
+        "Update fields on an existing contact. Only provided fields are changed (PATCH semantics); " +
+        "the Elorus API only supports PUT on contacts, so this fetches the current record and merges your fields into it before saving.",
       inputSchema: {
         id: z.string().describe("The Elorus contact ID to update"),
         company: z.string().optional().describe("Company name"),
@@ -143,7 +145,7 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
       },
     },
     async ({ id, ...fields }) => {
-      const result = await client.patch(`/contacts/${id}/`, fields);
+      const result = await client.mergePut(`/contacts/${id}/`, fields);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

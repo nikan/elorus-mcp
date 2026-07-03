@@ -122,7 +122,9 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
   server.registerTool(
     "update_expense",
     {
-      description: "Update fields on an existing expense. Only provided fields are changed (PATCH semantics).",
+      description:
+        "Update fields on an existing expense. Only provided fields are changed (PATCH semantics); " +
+        "the Elorus API only supports PUT on expenses, so this fetches the current record and merges your fields into it before saving.",
       inputSchema: {
         id: z.string().describe("The Elorus expense ID to update"),
         date: z.string().optional().describe("Expense date in YYYY-MM-DD format"),
@@ -135,7 +137,34 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
       },
     },
     async ({ id, ...fields }) => {
-      const result = await client.patch(`/expenses/${id}/`, fields);
+      const result = await client.mergePut(`/expenses/${id}/`, fields);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "add_expense_attachment",
+    {
+      description:
+        "Attach a file (e.g. a scanned receipt or supplier invoice PDF) to an existing expense. " +
+        "Provide the file content as base64.",
+      inputSchema: {
+        id: z.string().describe("The Elorus expense ID to attach the file to"),
+        filename: z.string().describe("File name including extension, e.g. 'receipt.pdf'"),
+        content_base64: z.string().describe("Base64-encoded file content"),
+        title: z
+          .string()
+          .optional()
+          .describe("Internal title to help identify the attachment (not the file name)"),
+      },
+    },
+    async ({ id, filename, content_base64, title }) => {
+      const form = new FormData();
+      if (title) form.append("title", title);
+      form.append("file", new Blob([Buffer.from(content_base64, "base64")]), filename);
+      const result = await client.postMultipart(`/expenses/${id}/attachments/`, form);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

@@ -95,6 +95,108 @@ describe("ElorusClient", () => {
     });
   });
 
+  describe("put()", () => {
+    it("sends a PUT with JSON-serialised body", async () => {
+      const mockFetch = makeFetch(200, { id: "abc", company: "Updated" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const body = { company: "Updated" };
+      await client.put("/contacts/abc/", body);
+
+      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(options.method).toBe("PUT");
+      expect(options.body).toBe(JSON.stringify(body));
+    });
+  });
+
+  describe("mergePut()", () => {
+    it("GETs the current record, merges fields on top, and PUTs the result", async () => {
+      const current = { id: "abc", company: "Acme", vat_number: "123", is_client: true };
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve(current),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve({ ...current, vat_number: "456" }),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await client.mergePut("/contacts/abc/", { vat_number: "456" });
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const [getUrl, getOptions] = mockFetch.mock.calls[0] as [string, RequestInit | undefined];
+      expect(getUrl).toBe("https://api.elorus.com/v1.2/contacts/abc/");
+      expect(getOptions?.method).toBeUndefined();
+
+      const [putUrl, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+      expect(putUrl).toBe("https://api.elorus.com/v1.2/contacts/abc/");
+      expect(putOptions.method).toBe("PUT");
+      expect(JSON.parse(putOptions.body as string)).toEqual({
+        id: "abc",
+        company: "Acme",
+        vat_number: "456",
+        is_client: true,
+      });
+    });
+
+    it("drops null-valued fields from the fetched record before merging", async () => {
+      const current = { id: "abc", company: "Acme", default_template: null, branch: null };
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve(current),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve({ ...current, company: "Updated" }),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await client.mergePut("/contacts/abc/", { company: "Updated" });
+
+      const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(putOptions.body as string)).toEqual({
+        id: "abc",
+        company: "Updated",
+      });
+    });
+  });
+
+  describe("postMultipart()", () => {
+    it("sends a POST with a FormData body and no Content-Type override", async () => {
+      const mockFetch = makeFetch(201, { id: "att-1" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const form = new FormData();
+      form.append("file", new Blob(["hello"]), "receipt.pdf");
+      await client.postMultipart("/expenses/abc/attachments/", form);
+
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://api.elorus.com/v1.2/expenses/abc/attachments/");
+      expect(options.method).toBe("POST");
+      expect(options.body).toBe(form);
+      const headers = options.headers as Record<string, string>;
+      expect(headers["Content-Type"]).toBeUndefined();
+      expect(headers["Authorization"]).toBe(`Token ${TEST_API_KEY}`);
+    });
+  });
+
   describe("204 No Content", () => {
     it("returns empty object for 204 responses", async () => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue({

@@ -45,6 +45,22 @@ export class ElorusClient {
     return this.handleResponse<T>(response);
   }
 
+  /**
+   * Elorus attachment endpoints require multipart/form-data. The hardcoded
+   * Content-Type on `this.headers` is for JSON requests, so it must be dropped
+   * here — fetch sets the correct multipart boundary itself when given a FormData body.
+   */
+  async postMultipart<T>(path: string, form: FormData): Promise<T> {
+    const headers = { ...this.headers };
+    delete headers["Content-Type"];
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+    return this.handleResponse<T>(response);
+  }
+
   async patch<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "PATCH",
@@ -52,6 +68,35 @@ export class ElorusClient {
       body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
+  }
+
+  async put<T>(path: string, body: unknown): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "PUT",
+      headers: this.headers,
+      body: JSON.stringify(body),
+    });
+    return this.handleResponse<T>(response);
+  }
+
+  /**
+   * Elorus doesn't support PATCH on every resource (expenses, contacts, products
+   * only accept PUT, which requires the full representation — e.g. expenses reject
+   * a PUT missing `items`). This fetches the current record, merges the partial
+   * fields on top, and PUTs the result so callers still get PATCH-like semantics.
+   *
+   * Some optional relations (e.g. a contact's `default_template`) round-trip as
+   * `null` from GET but reject an explicit `null` on write ("This field may not
+   * be null") — they must be omitted instead. So null-valued fields from the
+   * fetched record are dropped before merging; explicit nulls the caller passes
+   * in `fields` are preserved.
+   */
+  async mergePut<T>(path: string, fields: Record<string, unknown>): Promise<T> {
+    const current = await this.get<Record<string, unknown>>(path);
+    const currentWithoutNulls = Object.fromEntries(
+      Object.entries(current).filter(([, value]) => value !== null)
+    );
+    return this.put<T>(path, { ...currentWithoutNulls, ...fields });
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
