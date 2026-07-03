@@ -167,6 +167,12 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         date: z.string().optional().describe("Bill issue date in YYYY-MM-DD format"),
         due_date: z.string().optional().describe("Payment due date in YYYY-MM-DD format"),
         notes: z.string().optional().describe("Internal notes"),
+        reference: z
+          .string()
+          .optional()
+          .describe(
+            "Reference number or identifier for this bill (e.g. a supplier's customer/account reference)"
+          ),
         draft: z
           .boolean()
           .optional()

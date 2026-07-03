@@ -37,8 +37,8 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
       const result = await client.get("/cashpayments/", {
         page,
         page_size,
-        supplier,
-        bill,
+        contact: supplier,
+        purchase: bill,
         date_after,
         date_before,
         ordering,
@@ -76,7 +76,14 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
           .string()
           .optional()
           .describe("Exchange rate to organization base currency as a string, e.g. '1.000000'"),
-        notes: z.string().optional().describe("Internal notes about this payment"),
+        title: z
+          .string()
+          .optional()
+          .describe(
+            "Short label for this payment, e.g. the source bank and transaction reference " +
+              "('Starling — Direct Debit, ref 609952404001'). Cash payments have no separate " +
+              "notes field, so this is the only free-text field available."
+          ),
       },
     },
     async ({ supplier, bill, amount, ...rest }) => {
@@ -87,6 +94,31 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
         transaction_type: "ip",
         purchase_payments: bill ? [{ purchase: bill, amount }] : [],
       });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "update_cash_payment",
+    {
+      description:
+        "Update fields on an existing cash payment (e.g. its title/bank reference, date, or amount). " +
+        "Only provided fields are changed; the Elorus API only supports PUT on cash payments, so this " +
+        "fetches the current record and merges your fields into it before saving.",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash payment ID to update"),
+        date: z.string().optional().describe("Payment date in YYYY-MM-DD format"),
+        amount: z.string().optional().describe("Amount paid as a string, e.g. '250.00'"),
+        title: z
+          .string()
+          .optional()
+          .describe("Short label for this payment, e.g. the source bank and transaction reference"),
+      },
+    },
+    async ({ id, ...fields }) => {
+      const result = await client.mergePut(`/cashpayments/${id}/`, fields);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
