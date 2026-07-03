@@ -84,10 +84,19 @@ export class ElorusClient {
    * only accept PUT, which requires the full representation — e.g. expenses reject
    * a PUT missing `items`). This fetches the current record, merges the partial
    * fields on top, and PUTs the result so callers still get PATCH-like semantics.
+   *
+   * Some optional relations (e.g. a contact's `default_template`) round-trip as
+   * `null` from GET but reject an explicit `null` on write ("This field may not
+   * be null") — they must be omitted instead. So null-valued fields from the
+   * fetched record are dropped before merging; explicit nulls the caller passes
+   * in `fields` are preserved.
    */
   async mergePut<T>(path: string, fields: Record<string, unknown>): Promise<T> {
     const current = await this.get<Record<string, unknown>>(path);
-    return this.put<T>(path, { ...current, ...fields });
+    const currentWithoutNulls = Object.fromEntries(
+      Object.entries(current).filter(([, value]) => value !== null)
+    );
+    return this.put<T>(path, { ...currentWithoutNulls, ...fields });
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {

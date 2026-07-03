@@ -147,6 +147,35 @@ describe("ElorusClient", () => {
         is_client: true,
       });
     });
+
+    it("drops null-valued fields from the fetched record before merging", async () => {
+      const current = { id: "abc", company: "Acme", default_template: null, branch: null };
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve(current),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve({ ...current, company: "Updated" }),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await client.mergePut("/contacts/abc/", { company: "Updated" });
+
+      const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(putOptions.body as string)).toEqual({
+        id: "abc",
+        company: "Updated",
+      });
+    });
   });
 
   describe("postMultipart()", () => {
