@@ -178,6 +178,44 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
   );
 
   server.registerTool(
+    "add_bill_attachment",
+    {
+      description:
+        "Attach a file (e.g. a scanned receipt or supplier bill PDF) to an existing bill. " +
+        "Provide the file content as base64. By default the attachment is set as the primary " +
+        "receipt (the document shown in the bill's receipt panel).",
+      inputSchema: {
+        id: z.string().describe("The Elorus bill ID to attach the file to"),
+        filename: z.string().describe("File name including extension, e.g. 'bill.pdf'"),
+        content_base64: z.string().describe("Base64-encoded file content"),
+        title: z
+          .string()
+          .optional()
+          .describe("Internal title to help identify the attachment (not the file name)"),
+        primary: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe(
+            "Whether this attachment should be shown as the bill's primary receipt document. Default true."
+          ),
+      },
+    },
+    async ({ id, filename, content_base64, title, primary }) => {
+      const form = new FormData();
+      if (title) form.append("title", title);
+      form.append("file", new Blob([Buffer.from(content_base64, "base64")]), filename);
+      const result = await client.postMultipart<{ id: string }>(`/bills/${id}/attachments/`, form);
+      if (primary) {
+        await client.patch(`/bills/${id}/attachments/${result.id}/`, { primary: true });
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ ...result, primary }, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
     "void_bill",
     {
       description: "Void a supplier bill. A voided bill is excluded from financial reports and cannot be paid.",

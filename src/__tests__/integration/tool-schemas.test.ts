@@ -234,3 +234,69 @@ describe("delete_expense", () => {
     expect(options.method).toBe("DELETE");
   });
 });
+
+describe("add_bill_attachment", () => {
+  const elorusClient = new ElorusClient("fixture-key", "fixture-org");
+
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("uploads the file to /bills/{id}/attachments/ then PATCHes it primary by default", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        statusText: "Created",
+        headers: new Headers(),
+        json: () => Promise.resolve({ id: "att-1", primary: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve({ id: "att-1", primary: true }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await client.callTool({
+      name: "add_bill_attachment",
+      arguments: { id: "bill-1", filename: "bill.pdf", content_base64: "AAAA" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    const [uploadUrl, uploadOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/bills/bill-1/attachments/");
+    expect(uploadOptions.method).toBe("POST");
+
+    const [patchUrl, patchOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(patchUrl).toBe("https://api.elorus.com/v1.2/bills/bill-1/attachments/att-1/");
+    expect(patchOptions.method).toBe("PATCH");
+    expect(JSON.parse(patchOptions.body as string)).toEqual({ primary: true });
+  });
+
+  it("skips the primary PATCH when primary is set to false", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      statusText: "Created",
+      headers: new Headers(),
+      json: () => Promise.resolve({ id: "att-1", primary: false }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await client.callTool({
+      name: "add_bill_attachment",
+      arguments: { id: "bill-1", filename: "bill.pdf", content_base64: "AAAA", primary: false },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
