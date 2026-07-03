@@ -150,7 +150,8 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description:
         "Attach a file (e.g. a scanned receipt or supplier invoice PDF) to an existing expense. " +
-        "Provide the file content as base64.",
+        "Provide the file content as base64. By default the attachment is set as the primary " +
+        "receipt (the document shown in the expense's receipt panel).",
       inputSchema: {
         id: z.string().describe("The Elorus expense ID to attach the file to"),
         filename: z.string().describe("File name including extension, e.g. 'receipt.pdf'"),
@@ -159,15 +160,25 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           .string()
           .optional()
           .describe("Internal title to help identify the attachment (not the file name)"),
+        primary: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe(
+            "Whether this attachment should be shown as the expense's primary receipt document. Default true."
+          ),
       },
     },
-    async ({ id, filename, content_base64, title }) => {
+    async ({ id, filename, content_base64, title, primary }) => {
       const form = new FormData();
       if (title) form.append("title", title);
       form.append("file", new Blob([Buffer.from(content_base64, "base64")]), filename);
-      const result = await client.postMultipart(`/expenses/${id}/attachments/`, form);
+      const result = await client.postMultipart<{ id: string }>(`/expenses/${id}/attachments/`, form);
+      if (primary) {
+        await client.patch(`/expenses/${id}/attachments/${result.id}/`, { primary: true });
+      }
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ ...result, primary }, null, 2) }],
       };
     }
   );
