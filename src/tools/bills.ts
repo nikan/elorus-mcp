@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { lineItemSchema as billLineItemSchema } from "../schemas/line-item.js";
+import { billLineItemSchema } from "../schemas/bill-line-item.js";
 
 export function registerBillTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -31,14 +31,6 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           .string()
           .optional()
           .describe("Filter bills issued on or before this date (YYYY-MM-DD)"),
-        due_date_after: z
-          .string()
-          .optional()
-          .describe("Filter by due date on or after (YYYY-MM-DD)"),
-        due_date_before: z
-          .string()
-          .optional()
-          .describe("Filter by due date on or before (YYYY-MM-DD)"),
         ordering: z
           .string()
           .optional()
@@ -49,18 +41,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           .describe("Search term for bill number or supplier name"),
       },
     },
-    async ({
-      page,
-      page_size,
-      supplier,
-      status,
-      date_after,
-      date_before,
-      due_date_after,
-      due_date_before,
-      ordering,
-      search,
-    }) => {
+    async ({ page, page_size, supplier, status, date_after, date_before, ordering, search }) => {
       const result = await client.get("/bills/", {
         page,
         page_size,
@@ -68,8 +49,6 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         status,
         date_after,
         date_before,
-        due_date_after,
-        due_date_before,
         ordering,
         search,
       });
@@ -99,13 +78,10 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
     "create_bill",
     {
       description:
-        "Create a supplier bill (purchase invoice). Use list_taxes and list_document_types to obtain valid IDs before calling this tool.",
+        "Create a supplier bill (purchase invoice). Use list_taxes and list_expense_categories to obtain valid IDs before calling this tool.",
       inputSchema: {
         supplier: z.string().describe("Contact ID of the supplier issuing the bill"),
         date: z.string().describe("Bill issue date in YYYY-MM-DD format"),
-        documenttype: z
-          .string()
-          .describe("Document type ID (obtain from list_document_types)"),
         items: z
           .array(billLineItemSchema)
           .min(1)
@@ -126,20 +102,15 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           .string()
           .optional()
           .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
-        due_date: z
-          .string()
-          .optional()
-          .describe("Payment due date in YYYY-MM-DD format"),
         draft: z
           .boolean()
           .optional()
           .describe("Set true to save as draft without finalizing"),
-        notes: z.string().optional().describe("Internal notes"),
       },
     },
-    async (args) => {
-      const mode = args.calculator_mode ?? "initial";
-      args.items.forEach((item, i) => {
+    async ({ items, ...rest }) => {
+      const mode = rest.calculator_mode ?? "initial";
+      items.forEach((item, i) => {
         if (mode === "initial" && !item.unit_value) {
           throw new Error(
             `items[${i}]: calculator_mode 'initial' requires unit_value on each line item`
@@ -151,7 +122,11 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           );
         }
       });
-      const result = await client.post("/bills/", args);
+      const body = {
+        ...rest,
+        items: items.map(({ title, ...item }) => ({ ...item, description: title })),
+      };
+      const result = await client.post("/bills/", body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -161,17 +136,19 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
   server.registerTool(
     "update_bill",
     {
-      description: "Update fields on an existing bill. Only provided fields are changed (PATCH semantics).",
+      description:
+        "Update fields on an existing bill. Only provided fields are changed. Note: reference " +
+        "can only be set while the bill is in draft — the API rejects any field changes once " +
+        "a bill is issued, except for draft/date, so revert to draft first if needed.",
       inputSchema: {
         id: z.string().describe("The Elorus bill ID to update"),
         date: z.string().optional().describe("Bill issue date in YYYY-MM-DD format"),
-        due_date: z.string().optional().describe("Payment due date in YYYY-MM-DD format"),
-        notes: z.string().optional().describe("Internal notes"),
         reference: z
           .string()
           .optional()
           .describe(
-            "Reference number or identifier for this bill (e.g. a supplier's customer/account reference)"
+            "Reference number or identifier for this bill (e.g. a supplier's customer/account reference). " +
+              "Only settable while the bill is in draft."
           ),
         draft: z
           .boolean()
@@ -181,7 +158,13 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           ),
       },
     },
-    async ({ id, ...fields }) => {
+    async ({ id, reference, ...fields }) => {
+      if (reference !== undefined) {
+        const result = await client.mergePut(`/bills/${id}/`, { ...fields, reference });
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      }
       const result = await client.patch(`/bills/${id}/`, fields);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

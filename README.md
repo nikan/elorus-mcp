@@ -188,7 +188,7 @@ Read-only resources that return up to 100 of the most recent records as JSON, wi
 ## Notes
 
 - All monetary values are strings (e.g. `"1500.00"`) to avoid floating-point precision issues
-- Use `list_taxes`, `list_document_types`, `list_units`, and `list_expense_categories` to look up valid IDs before creating invoices, bills, expenses, credit notes, or products
-- Invoice/bill/credit-note/supplier-credit line items use `title`/`quantity`/`unit_value` (or `unit_total`, depending on `calculator_mode`); expense line items use a different shape: `expense_category`/`amount`/`description`
+- Use `list_taxes`, `list_document_types`, `list_units`, and `list_expense_categories` to look up valid IDs before creating invoices, bills, expenses, credit notes, or products (bills don't use a document type — only invoices, credit notes, and estimates do)
+- Invoice/credit-note/supplier-credit line items use `title`/`quantity`/`unit_value` (or `unit_total`, depending on `calculator_mode`); bill line items also require `expense_category`; expense line items use a different shape: `expense_category`/`amount`/`description`
 - Elorus does not provide idempotency keys — query before creating to avoid duplicates
 - Pagination params: `page` (default 1) and `page_size` (default 20, max 100)
