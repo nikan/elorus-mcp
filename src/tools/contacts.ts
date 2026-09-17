@@ -138,6 +138,10 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
         last_name: z.string().optional().describe("Last name"),
         is_client: z.boolean().optional().describe("Mark as client"),
         is_supplier: z.boolean().optional().describe("Mark as supplier"),
+        active: z
+          .boolean()
+          .optional()
+          .describe("Whether the contact is active (set to false to deactivate/archive it)"),
         vat_number: z.string().optional().describe("VAT / tax registration number"),
         email: z.string().email().optional().describe("Primary email address"),
         phone: z.string().optional().describe("Primary phone number"),
