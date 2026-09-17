@@ -89,6 +89,16 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `send_invoice_email` | Email an invoice to the client |
 | `export_invoice_pdf` | Export an invoice as a PDF (returns a download URL) |
 
+### Recurring invoices
+| Tool | Description |
+|---|---|
+| `list_recurring_invoices` | Filter recurring invoice schedules by client, document type, or status |
+| `get_recurring_invoice` | Fetch a recurring invoice schedule by ID |
+| `create_recurring_invoice` | Create a schedule that automatically generates sales invoices at a fixed interval. `end_datetime` is required (no "never expires" option) and must fall within a bounded window relative to the start date and interval/period |
+| `update_recurring_invoice` | Update fields (schedule, line items, etc.) on an existing recurring invoice schedule |
+| `pause_recurring_invoice` | Pause a schedule so it stops generating new invoices |
+| `resume_recurring_invoice` | Resume a paused schedule |
+
 ### Bills (supplier purchase invoices)
 | Tool | Description |
 |---|---|

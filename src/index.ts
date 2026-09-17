@@ -5,6 +5,7 @@ import { getConfig } from "./auth.js";
 import { ElorusClient } from "./client.js";
 import { registerContactTools } from "./tools/contacts.js";
 import { registerInvoiceTools } from "./tools/invoices.js";
+import { registerRecurringInvoiceTools } from "./tools/recurring-invoices.js";
 import { registerProductTools } from "./tools/products.js";
 import { registerConfigTools } from "./tools/config.js";
 import { registerCashReceiptTools } from "./tools/cash-receipts.js";
@@ -27,6 +28,7 @@ const server = new McpServer({
 // Tools
 registerContactTools(server, client);
 registerInvoiceTools(server, client);
+registerRecurringInvoiceTools(server, client);
 registerProductTools(server, client);
 registerConfigTools(server, client);
 registerCashReceiptTools(server, client);

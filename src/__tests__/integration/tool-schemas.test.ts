@@ -7,6 +7,7 @@ import { registerExpenseTools } from "../../tools/expenses.js";
 import { registerBillTools } from "../../tools/bills.js";
 import { registerCreditNoteTools } from "../../tools/credit-notes.js";
 import { registerInvoiceTools } from "../../tools/invoices.js";
+import { registerRecurringInvoiceTools } from "../../tools/recurring-invoices.js";
 import { registerSupplierCreditTools } from "../../tools/supplier-credits.js";
 import { registerContactTools } from "../../tools/contacts.js";
 
@@ -26,6 +27,7 @@ async function connectedClient(elorusClient: ElorusClient) {
   registerBillTools(server, elorusClient);
   registerCreditNoteTools(server, elorusClient);
   registerInvoiceTools(server, elorusClient);
+  registerRecurringInvoiceTools(server, elorusClient);
   registerSupplierCreditTools(server, elorusClient);
   registerContactTools(server, elorusClient);
 
@@ -63,6 +65,7 @@ describe("tool-list schema generation for create_* tools", () => {
     { name: "create_bill", hasRequiredFields: true },
     { name: "create_credit_note", hasRequiredFields: true },
     { name: "create_invoice", hasRequiredFields: true },
+    { name: "create_recurring_invoice", hasRequiredFields: true },
     { name: "create_supplier_credit", hasRequiredFields: true },
     { name: "create_contact", hasRequiredFields: false },
   ];
@@ -91,6 +94,16 @@ describe("tool-list schema generation for create_* tools", () => {
       expect.arrayContaining(["date", "documenttype", "items"])
     );
     expect(tool.inputSchema.properties).toHaveProperty("items");
+  });
+
+  it("create_recurring_invoice schema requires client, items, and end_datetime (the API rejects a blank/null end_datetime despite its docs implying otherwise)", async () => {
+    const client = await connectedClient(elorusClient);
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === "create_recurring_invoice")!;
+
+    expect(tool.inputSchema.required).toEqual(
+      expect.arrayContaining(["client", "items", "end_datetime"])
+    );
   });
 
   it("create_expense items schema matches the flat expense API shape (expense_category, amount, description) not the invoice line-item shape", async () => {

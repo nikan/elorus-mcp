@@ -291,10 +291,12 @@ Features deferred after the initial release. These add meaningful complexity (Gr
 
 ## Recurring Invoices
 
-The Elorus API exposes `/recurringinvoices/` for scheduled invoice generation. (No equivalent recurring endpoint exists for expenses or bills.)
+**Status: Implemented** — see `src/tools/recurring-invoices.ts`.
+
+The Elorus API exposes `/recurringinvoices/` for scheduled invoice generation. (No equivalent recurring endpoint exists for expenses or bills — confirmed again when the Proton recurring expense had to be set up manually in the web app, see `supplier-invoice-requirements.md`.)
 
 ### Tools
-- `create_recurring_invoice` — Create a recurring invoice template with schedule (daily/weekly/monthly/yearly)
+- `create_recurring_invoice` — Create a recurring invoice template with schedule (days/weeks/months only — no dedicated "yearly" period, use months with interval=12)
 - `get_recurring_invoice` — Fetch a recurring invoice template
 - `update_recurring_invoice` — Update schedule or line items
 - `list_recurring_invoices` — List active and paused recurring invoices
@@ -302,7 +304,8 @@ The Elorus API exposes `/recurringinvoices/` for scheduled invoice generation. (
 
 ### Design Notes
 - Recurring templates are distinct from the documents they generate; tool descriptions must make this clear so the LLM doesn't conflate editing a template with editing a posted invoice.
-- Include `next_occurrence` and `last_occurrence` in list responses so the LLM can answer scheduling questions without extra calls.
+- Include `next_execution` and `last_execution` in list/get responses so the LLM can answer scheduling questions without extra calls (the API's own field names, not `next_occurrence`/`last_occurrence`).
+- **`end_datetime` is required**, contrary to the API's own documentation ("leave blank to run forever" — verified false by live testing, the API rejects both a missing and a `null` value). It's also bounded: the API enforces a window relative to `start_datetime` and `interval`/`period` (observed roughly one period past the start at minimum, up to 5 years past it at maximum), returned as an `integrity_errors` message naming the exact valid range when violated.
 
 ---
 

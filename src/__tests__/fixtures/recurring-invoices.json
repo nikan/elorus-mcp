@@ -1,0 +1,39 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "4000000001",
+      "custom_id": "",
+      "start_datetime": "2026-01-01T06:00:00Z",
+      "interval": 1,
+      "period": "months",
+      "end_datetime": null,
+      "last_execution": null,
+      "next_execution": "2026-01-01T06:00:00Z",
+      "paused": false,
+      "representation": "01/01/26, every 1 months",
+      "documenttype": "3000000001",
+      "sequence": null,
+      "draft": false,
+      "auto_email": false,
+      "due_days": 30,
+      "template": null,
+      "client": "1000000001",
+      "currency_code": "EUR",
+      "exchange_rate": "1.000000",
+      "calculator_mode": "initial",
+      "items": [
+        { "title": "Hosting", "quantity": "1", "unit_value": "50.00" }
+      ],
+      "initial": "50.00",
+      "net": "50.00",
+      "total": "62.00",
+      "payable": "62.00",
+      "organization": "3406315494884508916",
+      "created": "2026-01-01T00:00:00Z",
+      "modified": "2026-01-01T00:00:00Z"
+    }
+  ]
+}
