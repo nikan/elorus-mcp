@@ -4,3 +4,4 @@ dist/
 .env
 .env.dev
 supplier-invoice-requirements.xlsx
+supplier-invoice-requirements.md
