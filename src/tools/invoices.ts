@@ -3,6 +3,15 @@ import { z } from "zod";
 import { ElorusClient } from "../client.js";
 import { lineItemSchema } from "../schemas/line-item.js";
 
+/** The email defaults endpoint returns cc/bcc as comma-separated strings; the send endpoint expects arrays. */
+function splitEmailList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+}
+
 export function registerInvoiceTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
     "list_invoices",
@@ -140,35 +149,24 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         due_date: z
           .string()
           .optional()
-          .describe("Payment due date in YYYY-MM-DD format"),
+          .describe(
+            "Payment due date in YYYY-MM-DD format. Converted to the API's due_days (days after the issue date)."
+          ),
         draft: z
           .boolean()
           .optional()
           .describe(
             "Set true to save as draft without finalizing or submitting to tax authority"
           ),
-        paid_on_receipt: z
+        notes: z
           .string()
           .optional()
-          .describe("Amount paid immediately upon issue as a string, e.g. '0.00'"),
-        payment_method: z
-          .enum(["1", "2", "3", "4", "5", "6", "7"])
-          .optional()
-          .describe(
-            "Payment method: 1=bank account, 2=cash, 3=cheque, 4=web banking, 5=POS, 6=PayPal, 7=other"
-          ),
-        notes: z.string().optional().describe("Internal or external notes on the invoice"),
-        mydata_document_type: z
-          .string()
-          .optional()
-          .describe(
-            "AADE myDATA document type code (e.g. '1.1' for domestic sales invoice). Required for Greek organizations."
-          ),
+          .describe("Notes displayed on the invoice's printable form (maps to the API's public_notes field)"),
       },
     },
-    async (args) => {
-      const mode = args.calculator_mode ?? "initial";
-      args.items.forEach((item, i) => {
+    async ({ due_date, notes, ...rest }) => {
+      const mode = rest.calculator_mode ?? "initial";
+      rest.items.forEach((item, i) => {
         if (mode === "initial" && !item.unit_value) {
           throw new Error(
             `items[${i}]: calculator_mode 'initial' requires unit_value (price before tax) on each line item`
@@ -180,7 +178,17 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
           );
         }
       });
-      const result = await client.post("/invoices/", args);
+      const body: Record<string, unknown> = { ...rest, public_notes: notes };
+      if (due_date) {
+        const days = Math.round(
+          (Date.parse(due_date) - Date.parse(rest.date)) / (24 * 60 * 60 * 1000)
+        );
+        if (Number.isNaN(days) || days < 0) {
+          throw new Error("due_date must be a valid YYYY-MM-DD date on or after the invoice date");
+        }
+        body.due_days = days;
+      }
+      const result = await client.post("/invoices/", body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -196,7 +204,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
       },
     },
     async ({ id }) => {
-      const result = await client.post(`/invoices/${id}/void/`, {});
+      const result = await client.put(`/invoices/${id}/void/`, { void: true });
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -206,29 +214,56 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
   server.registerTool(
     "send_invoice_email",
     {
-      description: "Email an invoice to the client. Uses the organization's default email template unless overridden.",
+      description:
+        "Email an invoice to the client. First fetches the organization's default recipient/subject/message " +
+        "for this invoice, then overrides them with any fields you provide before sending.",
       inputSchema: {
         id: z.string().describe("The Elorus invoice ID to send"),
         to: z
-          .array(z.string().email())
-          .min(1)
-          .describe("Recipient email addresses"),
+          .string()
+          .email()
+          .optional()
+          .describe("Recipient email address (default: the client's stored email)"),
         subject: z
           .string()
           .optional()
-          .describe("Email subject line (uses default template if omitted)"),
+          .describe("Email subject line (default: the organization's email template)"),
         message: z
           .string()
           .optional()
-          .describe("Email body text (uses default template if omitted)"),
+          .describe("Email body text, may contain HTML (default: the organization's email template)"),
         cc: z
           .array(z.string().email())
           .optional()
-          .describe("CC email addresses"),
+          .describe("CC email addresses (default: the organization's configured CC list)"),
+        bcc: z
+          .array(z.string().email())
+          .optional()
+          .describe("BCC email addresses (default: the organization's configured BCC list)"),
+        attach_pdf: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Whether to attach the invoice PDF to the email (default: true)"),
       },
     },
-    async ({ id, ...body }) => {
-      const result = await client.post(`/invoices/${id}/sendmail/`, body);
+    async ({ id, to, subject, message, cc, bcc, attach_pdf }) => {
+      const defaults = await client.get<{
+        to?: string;
+        cc?: string;
+        bcc?: string;
+        subject?: string;
+        message?: string;
+      }>(`/invoices/${id}/email/`);
+      const body = {
+        to: to ?? defaults.to,
+        subject: subject ?? defaults.subject,
+        message: message ?? defaults.message,
+        cc: cc ?? splitEmailList(defaults.cc),
+        bcc: bcc ?? splitEmailList(defaults.bcc),
+        attach_pdf,
+      };
+      const result = await client.post(`/invoices/${id}/email/`, body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -238,15 +273,24 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
   server.registerTool(
     "export_invoice_pdf",
     {
-      description: "Export an invoice as a PDF. Returns a download URL for the generated PDF file.",
+      description: "Export an invoice as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
         id: z.string().describe("The Elorus invoice ID to export"),
       },
     },
     async ({ id }) => {
-      const result = await client.get(`/invoices/${id}/pdf/`);
+      const { data, contentType } = await client.getBinary(`/invoices/${id}/pdf/`);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [
+          {
+            type: "resource" as const,
+            resource: {
+              uri: `elorus://invoices/${id}/pdf`,
+              mimeType: contentType,
+              blob: data.toString("base64"),
+            },
+          },
+        ],
       };
     }
   );

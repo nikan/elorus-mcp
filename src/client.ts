@@ -7,6 +7,14 @@ export interface PaginatedResponse<T> {
 
 export type QueryParams = Record<string, string | number | boolean | undefined>;
 
+/** Bounds the base64-encoded blob returned to an MCP client over stdio. */
+const MAX_BINARY_RESPONSE_BYTES = 10 * 1024 * 1024;
+
+export interface BinaryResponse {
+  data: Buffer;
+  contentType: string;
+}
+
 export class ElorusClient {
   private readonly baseUrl = "https://api.elorus.com/v1.2";
   private readonly headers: Record<string, string>;
@@ -77,6 +85,46 @@ export class ElorusClient {
       body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
+  }
+
+  /**
+   * For endpoints (e.g. PDF exports) that return a binary body instead of JSON.
+   * `handleResponse` always calls `response.json()`, so this bypasses it entirely.
+   */
+  async getBinary(path: string): Promise<BinaryResponse> {
+    const headers = { ...this.headers, Accept: "application/pdf" };
+    const response = await fetch(`${this.baseUrl}${path}`, { headers });
+    if (!response.ok) {
+      let details = response.statusText;
+      try {
+        const body = await response.json();
+        details = formatDrfError(body);
+      } catch {
+        // use statusText
+      }
+      throw new Error(formatHttpError(response.status, details));
+    }
+    const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+    if (!contentType.includes("pdf")) {
+      throw new Error(
+        `Elorus API error: expected a PDF response from ${path} but got Content-Type "${contentType}"`
+      );
+    }
+    const contentLength = Number(response.headers.get("content-length") ?? "0");
+    if (contentLength > MAX_BINARY_RESPONSE_BYTES) {
+      throw new Error(
+        `Elorus API error: PDF at ${path} is ${contentLength} bytes, exceeding the ` +
+          `${MAX_BINARY_RESPONSE_BYTES}-byte limit for inline MCP responses`
+      );
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_BINARY_RESPONSE_BYTES) {
+      throw new Error(
+        `Elorus API error: PDF at ${path} is ${arrayBuffer.byteLength} bytes, exceeding the ` +
+          `${MAX_BINARY_RESPONSE_BYTES}-byte limit for inline MCP responses`
+      );
+    }
+    return { data: Buffer.from(arrayBuffer), contentType };
   }
 
   async delete<T>(path: string): Promise<T> {

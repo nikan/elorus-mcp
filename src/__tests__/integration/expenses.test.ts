@@ -39,6 +39,18 @@ function mockFetchWith(body: unknown, status = 200) {
   return mockFetch;
 }
 
+function mockFetchPdf(bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46])) {
+  const mockFetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    headers: new Headers({ "content-type": "application/pdf", "content-length": String(bytes.length) }),
+    arrayBuffer: () => Promise.resolve(bytes.buffer),
+  });
+  vi.stubGlobal("fetch", mockFetch);
+  return mockFetch;
+}
+
 describe("expense tools (list/get/update/attachments/pdf)", () => {
   const elorusClient = new ElorusClient("fixture-key", "fixture-org");
 
@@ -46,20 +58,19 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("list_expenses GETs /expenses/ with supplier and category filters", async () => {
+  it("list_expenses GETs /expenses/ with a supplier filter", async () => {
     const mockFetch = mockFetchWith({ count: 0, results: [] });
     const client = await connectedClient(elorusClient);
 
     await client.callTool({
       name: "list_expenses",
-      arguments: { supplier: "sup-1", expense_category: "cat-1" },
+      arguments: { supplier: "sup-1" },
     });
 
     const [url] = mockFetch.mock.calls[0] as [string];
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/v1.2/expenses/");
     expect(parsed.searchParams.get("supplier")).toBe("sup-1");
-    expect(parsed.searchParams.get("expense_category")).toBe("cat-1");
   });
 
   it("get_expense fetches a single expense by id", async () => {
@@ -74,7 +85,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
   });
 
   it("update_expense fetches the current record, merges fields, and PUTs", async () => {
-    const current = { id: "exp-1", date: "2026-07-01", notes: "" };
+    const current = { id: "exp-1", date: "2026-07-01", reference: "" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -89,20 +100,71 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ ...current, notes: "Reimbursed" }),
+        json: () => Promise.resolve({ ...current, reference: "REIMB-1" }),
       });
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_expense",
-      arguments: { id: "exp-1", notes: "Reimbursed" },
+      arguments: { id: "exp-1", reference: "REIMB-1" },
     });
 
     expect(result.isError).toBeFalsy();
     const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
     expect(putOptions.method).toBe("PUT");
-    expect(JSON.parse(putOptions.body as string)).toMatchObject({ notes: "Reimbursed" });
+    expect(JSON.parse(putOptions.body as string)).toMatchObject({ reference: "REIMB-1" });
+  });
+
+  it("update_expense with expense_category re-fetches the record and applies the category to every item", async () => {
+    const current = {
+      id: "exp-1",
+      date: "2026-07-01",
+      items: [
+        { id: "item-1", expense_category: "old-cat", amount: "10.00" },
+        { id: "item-2", expense_category: "old-cat", amount: "20.00" },
+      ],
+    };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_expense",
+      arguments: { id: "exp-1", expense_category: "new-cat" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const [, putOptions] = mockFetch.mock.calls[2] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([
+      { id: "item-1", expense_category: "new-cat", amount: "10.00" },
+      { id: "item-2", expense_category: "new-cat", amount: "20.00" },
+    ]);
   });
 
   it("add_expense_attachment uploads the file then PATCHes it primary by default", async () => {
@@ -182,6 +244,8 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
 
     const tmpFile = path.join(os.tmpdir(), `elorus-mcp-test-${Date.now()}.pdf`);
     fs.writeFileSync(tmpFile, "fake pdf bytes");
+    const previousRoot = process.env.ELORUS_ATTACHMENT_ROOT;
+    process.env.ELORUS_ATTACHMENT_ROOT = os.tmpdir();
     try {
       const result = await client.callTool({
         name: "add_expense_attachment",
@@ -196,6 +260,47 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
       expect(await file.text()).toBe("fake pdf bytes");
     } finally {
       fs.unlinkSync(tmpFile);
+      process.env.ELORUS_ATTACHMENT_ROOT = previousRoot;
+    }
+  });
+
+  it("add_expense_attachment rejects a file_path outside ELORUS_ATTACHMENT_ROOT", async () => {
+    const client = await connectedClient(elorusClient);
+    const tmpFile = path.join(os.tmpdir(), `elorus-mcp-test-outside-${Date.now()}.pdf`);
+    fs.writeFileSync(tmpFile, "fake pdf bytes");
+    const previousRoot = process.env.ELORUS_ATTACHMENT_ROOT;
+    process.env.ELORUS_ATTACHMENT_ROOT = path.join(os.tmpdir(), `elorus-mcp-allowlist-${Date.now()}`);
+    fs.mkdirSync(process.env.ELORUS_ATTACHMENT_ROOT, { recursive: true });
+    try {
+      const result = await client.callTool({
+        name: "add_expense_attachment",
+        arguments: { id: "exp-1", file_path: tmpFile },
+      });
+
+      expect(result.isError).toBe(true);
+    } finally {
+      fs.unlinkSync(tmpFile);
+      fs.rmSync(process.env.ELORUS_ATTACHMENT_ROOT, { recursive: true, force: true });
+      process.env.ELORUS_ATTACHMENT_ROOT = previousRoot;
+    }
+  });
+
+  it("add_expense_attachment rejects file_path when ELORUS_ATTACHMENT_ROOT is not configured", async () => {
+    const client = await connectedClient(elorusClient);
+    const tmpFile = path.join(os.tmpdir(), `elorus-mcp-test-noroot-${Date.now()}.pdf`);
+    fs.writeFileSync(tmpFile, "fake pdf bytes");
+    const previousRoot = process.env.ELORUS_ATTACHMENT_ROOT;
+    delete process.env.ELORUS_ATTACHMENT_ROOT;
+    try {
+      const result = await client.callTool({
+        name: "add_expense_attachment",
+        arguments: { id: "exp-1", file_path: tmpFile },
+      });
+
+      expect(result.isError).toBe(true);
+    } finally {
+      fs.unlinkSync(tmpFile);
+      process.env.ELORUS_ATTACHMENT_ROOT = previousRoot;
     }
   });
 
@@ -212,8 +317,8 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("export_expense_pdf GETs the pdf sub-resource", async () => {
-    const mockFetch = mockFetchWith({ url: "https://files.elorus.com/expense.pdf" });
+  it("export_expense_pdf GETs the pdf sub-resource and returns a base64 resource blob", async () => {
+    const mockFetch = mockFetchPdf();
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({ name: "export_expense_pdf", arguments: { id: "exp-1" } });
@@ -221,5 +326,8 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toBe("https://api.elorus.com/v1.2/expenses/exp-1/pdf/");
+    const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
+    expect(content[0].type).toBe("resource");
+    expect(content[0].resource.mimeType).toBe("application/pdf");
   });
 });

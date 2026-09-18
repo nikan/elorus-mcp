@@ -75,10 +75,6 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
         company: z.string().optional().describe("Company name (for company-type contacts)"),
         first_name: z.string().optional().describe("First name (for individual contacts)"),
         last_name: z.string().optional().describe("Last name (for individual contacts)"),
-        client_type: z
-          .enum(["1", "2"])
-          .optional()
-          .describe("Contact type: '1' for company, '2' for individual (default: '1')"),
         is_client: z
           .boolean()
           .optional()
@@ -88,37 +84,45 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe("Mark as a supplier (can record bills and payments to them)"),
         vat_number: z.string().optional().describe("VAT / tax registration number"),
-        email: z.string().email().optional().describe("Primary email address"),
-        phone: z.string().optional().describe("Primary phone number"),
+        email: z
+          .string()
+          .email()
+          .optional()
+          .describe("Primary email address (stored as this contact's sole primary email account)"),
+        phone: z
+          .string()
+          .optional()
+          .describe("Primary phone number (stored as this contact's sole primary phone number)"),
         addresses: z
           .array(
             z.object({
-              address: z.string().optional().describe("Street address"),
-              city: z.string().optional().describe("City"),
-              zip: z.string().optional().describe("Postal / ZIP code"),
+              address: z.string().describe("Street address"),
+              city: z.string().describe("City"),
+              zip: z.string().describe("Postal / ZIP code"),
               country: z
                 .string()
                 .length(2)
-                .optional()
                 .describe("ISO 3166-1 alpha-2 country code, e.g. 'GR', 'US'"),
               ad_type: z
-                .enum(["bill", "ship"])
+                .enum(["bill", "ship", "other"])
                 .optional()
-                .describe("Address type: 'bill' for billing, 'ship' for shipping"),
+                .describe("Address type: 'bill' for billing, 'ship' for shipping, 'other' otherwise"),
             })
           )
           .optional()
           .describe("One or more addresses for this contact"),
-        notes: z.string().optional().describe("Internal notes about this contact"),
       },
     },
-    async (args) => {
+    async ({ email, phone, ...args }) => {
       if (!args.company && !args.first_name && !args.last_name) {
         throw new Error(
           "Provide 'company' for a business contact, or 'first_name'/'last_name' for an individual"
         );
       }
-      const result = await client.post("/contacts/", args);
+      const body: Record<string, unknown> = { ...args };
+      if (email) body.email = [{ email, primary: true }];
+      if (phone) body.phones = [{ number: phone, primary: true }];
+      const result = await client.post("/contacts/", body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -143,13 +147,22 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe("Whether the contact is active (set to false to deactivate/archive it)"),
         vat_number: z.string().optional().describe("VAT / tax registration number"),
-        email: z.string().email().optional().describe("Primary email address"),
-        phone: z.string().optional().describe("Primary phone number"),
-        notes: z.string().optional().describe("Internal notes"),
+        email: z
+          .string()
+          .email()
+          .optional()
+          .describe("Primary email address (replaces this contact's entire list of email addresses with this single primary one)"),
+        phone: z
+          .string()
+          .optional()
+          .describe("Primary phone number (replaces this contact's entire list of phone numbers with this single primary one)"),
       },
     },
-    async ({ id, ...fields }) => {
-      const result = await client.mergePut(`/contacts/${id}/`, fields);
+    async ({ id, email, phone, ...fields }) => {
+      const body: Record<string, unknown> = { ...fields };
+      if (email) body.email = [{ email, primary: true }];
+      if (phone) body.phones = [{ number: phone, primary: true }];
+      const result = await client.mergePut(`/contacts/${id}/`, body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

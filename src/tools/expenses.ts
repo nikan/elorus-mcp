@@ -1,8 +1,8 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { readAttachmentFile } from "../attachments.js";
 import { expenseLineItemSchema } from "../schemas/expense-line-item.js";
 
 export function registerExpenseTools(server: McpServer, client: ElorusClient): void {
@@ -10,7 +10,8 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     "list_expenses",
     {
       description:
-        "List expense records. Returns paginated results. Filter by supplier, category, or date range.",
+        "List expense records. Returns paginated results. Filter by supplier or date range. " +
+        "(Expense category is a per-line-item field and cannot be filtered on directly — fetch expenses and inspect items.)",
       inputSchema: {
         page: z.number().int().min(1).optional().describe("Page number (default: 1)"),
         page_size: z
@@ -21,10 +22,6 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe("Results per page (default: 20, max: 100)"),
         supplier: z.string().optional().describe("Filter by supplier contact ID"),
-        expense_category: z
-          .string()
-          .optional()
-          .describe("Filter by expense category ID (obtain from list_expense_categories)"),
         date_after: z
           .string()
           .optional()
@@ -43,12 +40,11 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           .describe("Search term for expense description or supplier name"),
       },
     },
-    async ({ page, page_size, supplier, expense_category, date_after, date_before, ordering, search }) => {
+    async ({ page, page_size, supplier, date_after, date_before, ordering, search }) => {
       const result = await client.get("/expenses/", {
         page,
         page_size,
         supplier,
-        expense_category,
         date_after,
         date_before,
         ordering,
@@ -80,12 +76,11 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     "create_expense",
     {
       description:
-        "Record a new business expense. Use list_taxes, list_document_types, and list_expense_categories to obtain valid IDs before calling this tool.",
+        "Record a new business expense. Use list_taxes and list_expense_categories to obtain valid IDs before calling this tool " +
+        "(each line item requires an expense_category).",
       inputSchema: {
         date: z.string().describe("Expense date in YYYY-MM-DD format"),
-        documenttype: z
-          .string()
-          .describe("Document type ID (obtain from list_document_types)"),
+        reference: z.string().optional().describe("Reference number or identifier for this expense"),
         items: z
           .array(expenseLineItemSchema)
           .min(1)
@@ -110,7 +105,6 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           .string()
           .optional()
           .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
-        notes: z.string().optional().describe("Internal notes"),
       },
     },
     async ({ items, ...rest }) => {
@@ -141,13 +135,22 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
         expense_category: z
           .string()
           .optional()
-          .describe("Expense category ID (obtain from list_expense_categories)"),
-        notes: z.string().optional().describe("Internal notes"),
+          .describe(
+            "Expense category ID (obtain from list_expense_categories). Applied to every line item on the expense."
+          ),
         reference: z.string().optional().describe("Reference number or identifier for this expense"),
       },
     },
-    async ({ id, ...fields }) => {
-      const result = await client.mergePut(`/expenses/${id}/`, fields);
+    async ({ id, expense_category, ...fields }) => {
+      let overrides: Record<string, unknown> = fields;
+      if (expense_category !== undefined) {
+        const current = await client.get<{ items?: Array<Record<string, unknown>> }>(`/expenses/${id}/`);
+        overrides = {
+          ...fields,
+          items: (current.items ?? []).map((item) => ({ ...item, expense_category })),
+        };
+      }
+      const result = await client.mergePut(`/expenses/${id}/`, overrides);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -178,20 +181,21 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description:
         "Attach a file (e.g. a scanned receipt or supplier invoice PDF) to an existing expense. " +
-        "Provide EITHER file_path (read directly off this machine's local disk — e.g. a PDF a " +
-        "Collect run already saved into the accounting folder) OR content_base64 (raw bytes " +
-        "supplied by the caller). Prefer file_path whenever the file already exists on disk: it " +
-        "avoids pushing a large base64 string through the calling client. By default the " +
-        "attachment is set as the primary receipt (the document shown in the expense's receipt panel).",
+        "Provide EITHER file_path (read directly off this machine's local disk, restricted to the " +
+        "directory tree configured via the ELORUS_ATTACHMENT_ROOT environment variable) OR " +
+        "content_base64 (raw bytes supplied by the caller). Prefer file_path whenever the file already " +
+        "exists on disk under that root: it avoids pushing a large base64 string through the calling " +
+        "client. By default the attachment is set as the primary receipt (the document shown in the " +
+        "expense's receipt panel).",
       inputSchema: {
         id: z.string().describe("The Elorus expense ID to attach the file to"),
         file_path: z
           .string()
           .optional()
           .describe(
-            "Absolute path to a file already on this machine's local disk, e.g. " +
-              "'C:\\\\Users\\\\nanag\\\\OneDrive\\\\Professional\\\\PLS\\\\Accounting\\\\FY2026-27\\\\invoice.pdf'. " +
-              "Read directly from disk — use this instead of content_base64 whenever the file already exists locally."
+            "Absolute path to a file already on this machine's local disk, under the directory " +
+              "configured via ELORUS_ATTACHMENT_ROOT. Use this instead of content_base64 whenever the " +
+              "file already exists locally."
           ),
         filename: z
           .string()
@@ -221,7 +225,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
       let buffer: Buffer;
       let resolvedFilename: string;
       if (file_path) {
-        buffer = fs.readFileSync(file_path);
+        buffer = await readAttachmentFile(file_path);
         resolvedFilename = filename ?? path.basename(file_path);
       } else if (content_base64) {
         if (!filename) {
@@ -248,15 +252,24 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
   server.registerTool(
     "export_expense_pdf",
     {
-      description: "Export an expense document as a PDF. Returns a download URL for the generated PDF file.",
+      description: "Export an expense document as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
         id: z.string().describe("The Elorus expense ID to export"),
       },
     },
     async ({ id }) => {
-      const result = await client.get(`/expenses/${id}/pdf/`);
+      const { data, contentType } = await client.getBinary(`/expenses/${id}/pdf/`);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [
+          {
+            type: "resource" as const,
+            resource: {
+              uri: `elorus://expenses/${id}/pdf`,
+              mimeType: contentType,
+              blob: data.toString("base64"),
+            },
+          },
+        ],
       };
     }
   );

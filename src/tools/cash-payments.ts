@@ -58,11 +58,6 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
         supplier: z.string().describe("Contact ID of the supplier being paid"),
         date: z.string().describe("Payment date in YYYY-MM-DD format"),
         amount: z.string().describe("Amount paid as a string, e.g. '250.00'"),
-        payment_method: z
-          .enum(["1", "2", "3", "4", "5", "6", "7"])
-          .describe(
-            "Payment method: 1=bank account, 2=cash, 3=cheque, 4=web banking, 5=POS, 6=PayPal, 7=other"
-          ),
         bill: z
           .string()
           .optional()

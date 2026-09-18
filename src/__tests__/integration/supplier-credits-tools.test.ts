@@ -72,6 +72,27 @@ describe("supplier credit tools (list/apply)", () => {
     expect(JSON.parse(options.body as string)).toMatchObject({ supplier: "sup-1" });
   });
 
+  it("create_supplier_credit maps notes to public_notes", async () => {
+    const mockFetch = mockFetchWith({ id: "sc-2" }, 201);
+    const client = await connectedClient(elorusClient);
+
+    await client.callTool({
+      name: "create_supplier_credit",
+      arguments: {
+        supplier: "sup-1",
+        date: "2026-07-01",
+        documenttype: "doctype-1",
+        notes: "Price correction",
+        items: [{ title: "Refund", quantity: "1", unit_value: "50.00" }],
+      },
+    });
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(options.body as string);
+    expect(body.public_notes).toBe("Price correction");
+    expect(body.notes).toBeUndefined();
+  });
+
   it("create_supplier_credit rejects a line item missing unit_value under calculator_mode 'initial' without reaching the API", async () => {
     const mockFetch = mockFetchWith({});
     const client = await connectedClient(elorusClient);
@@ -90,7 +111,7 @@ describe("supplier credit tools (list/apply)", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("apply_supplier_credit POSTs bill/amount to the apply sub-resource", async () => {
+  it("apply_supplier_credit POSTs purchase/amount to the applied-credit sub-resource", async () => {
     const mockFetch = mockFetchWith({ applied: true });
     const client = await connectedClient(elorusClient);
 
@@ -101,7 +122,7 @@ describe("supplier credit tools (list/apply)", () => {
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/apply/");
-    expect(JSON.parse(options.body as string)).toEqual({ bill: "bill-1", amount: "100.00" });
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/applied-credit/");
+    expect(JSON.parse(options.body as string)).toEqual({ purchase: "bill-1", amount: "100.00" });
   });
 });
