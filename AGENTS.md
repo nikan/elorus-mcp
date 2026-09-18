@@ -17,7 +17,7 @@ npm run test:coverage   # vitest run --coverage
 npm start               # node --env-file=.env dist/index.js (local dev; requires npm run build first)
 ```
 
-Run a single test file: `npx vitest run src/tools/__tests__/invoices.test.ts` (or any path). Run tests matching a name: `npx vitest run -t "void"`.
+Run a single test file: `npx vitest run src/__tests__/integration/invoices.test.ts` (or any path). Run tests matching a name: `npx vitest run -t "void"`.
 
 Local dev needs `ELORUS_API_KEY` and `ELORUS_ORG_ID` (copy `.env.example` to `.env`). Only `npm start` reads `.env` (via `node --env-file`); when launched through an MCP client config (Claude Desktop/Code), that config's own `env` block is what's used instead — the two are not merged. `ELORUS_DEMO=1` targets Elorus's demo/sandbox org. `ELORUS_ATTACHMENT_ROOT` must be set to allow `file_path`-based attachment uploads (`add_bill_attachment`/`add_expense_attachment`); unset, only `content_base64` works.
 

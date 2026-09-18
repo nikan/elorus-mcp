@@ -56,6 +56,15 @@ and `project`. That gets corrected in Phase 1.
 - **Update pattern**: `client.patch()` where the API supports PATCH; `client.mergePut()`
   (GET, drop nulls + `READ_ONLY_RESPONSE_FIELDS`, merge caller fields, PUT) where it's
   PUT-only. See `src/client.ts` `mergePut`, used in `bills.ts` `update_bill`.
+  **Caveat for invoices/credit notes/supplier credits**: PATCH on these three
+  document types does not update line items or amounts, and full PUT replacement
+  of items is only permitted while the document is a draft, requiring the
+  complete item list including existing line IDs (omitting an existing ID
+  deletes that line). New update tools for these types (see Phase 1) must
+  either restrict item edits to draft-status documents with full, ID-preserving
+  item arrays, or support PATCH for non-item fields only and clearly document
+  that item changes need a separate, draft-only path — never silently drop or
+  delete lines. See https://developer.elorus.com/.
 - **Void**: `client.put(`/…/{id}/void/`, { void: true })` — `invoices.ts:198-212`.
 - **Email**: GET `/…/{id}/email/` for defaults, merge caller overrides (cc/bcc via
   `splitEmailList`), POST merged body to same path — `invoices.ts:214-271`. This is
@@ -95,16 +104,30 @@ and `project`. That gets corrected in Phase 1.
    `add_attachment` (generalizes the file_path/content_base64/primary logic
    currently duplicated in `bills.ts`/`expenses.ts`), `update_attachment` (title,
    PATCH), `delete_attachment`, `download_attachment` (binary, via the generalized
-   client method below). **Breaking change**: this replaces `add_bill_attachment`
-   and `add_expense_attachment` — remove them, update README and their existing
-   tests to call `add_attachment` with `resource_type: "bill"|"expense"` instead.
+   client method below). **Non-breaking**: keep `add_bill_attachment` and
+   `add_expense_attachment` as thin, deprecated wrappers that call the same
+   underlying logic as `add_attachment` with `resource_type` fixed to
+   `"bill"`/`"expense"` — existing MCP clients and saved workflows keep working.
+   Mark both descriptions as deprecated in favor of `add_attachment`, keep their
+   existing tests passing unchanged, and leave actual removal to a future
+   major-version migration rather than this plan.
 3. **New `src/tools/sent-emails.ts`** — `list_sent_emails`, `resource_type` enum =
    the 7 email-capable types.
-4. **Applied-credit list/unapply** — add `list_applied_credit` and `unapply_credit`
-   (DELETE `/{type}s/{id}/applied-credit/{appliedId}/`) to `credit-notes.ts` and
-   `supplier-credits.ts` (and add the equivalent read for `invoices.ts`, which also
-   exposes `/applied-credit/` for the invoice-side view). Keep existing
-   `apply_credit_note`/`apply_supplier_credit` unchanged (body key differs by type).
+4. **Applied-credit list/unapply** — this is another shared sub-resource per the
+   matrix above, so generalize it the same way as notes/attachments/sent-emails
+   instead of registering it per resource module (registering
+   `list_applied_credit`/`unapply_credit` separately in both `credit-notes.ts`
+   and `supplier-credits.ts` would collide on tool name, since MCP tool names
+   share one server namespace). Add a single generic tool pair —
+   `list_applied_credit(resource_type, resource_id)` and
+   `unapply_credit(resource_type, resource_id, applied_credit_id)` (DELETE
+   `/{resource_type}s/{id}/applied-credit/{appliedId}/`) — with `resource_type`
+   enum `"invoice" | "creditnote" | "suppliercredit"`, following the exact
+   `notes.ts` path-building convention (regular pluralization). This covers the
+   invoice-side read too, so no separate invoice-only tool is needed. Keep
+   `apply_credit_note`/`apply_supplier_credit` unchanged and resource-specific,
+   since their POST body key differs by type (`invoice` vs `purchase`) — only
+   the structurally-identical list/unapply operations are generic.
 5. **`src/client.ts`** — generalize `getBinary` (or add a sibling method) to accept
    an expected content-type prefix instead of hardcoding `"pdf"`, since attachments
    can be images/docs/etc. Confirm `fetch`'s default redirect-following handles the
@@ -120,11 +143,18 @@ New tools on already-wrapped resources (files in parentheses):
 `get_supplier_credit`, `update_supplier_credit`, `delete_supplier_credit`,
 `void_supplier_credit`, `send_supplier_credit_email`, `export_supplier_credit_pdf`
 (`supplier-credits.ts`),
-`delete_bill`, `send_bill_email` (`bills.ts`),
+`delete_bill`, `send_bill_email`, `export_bill_pdf` (`bills.ts`),
 `get_cash_receipt`, `update_cash_receipt`, `delete_cash_receipt` (`cash-receipts.ts`),
 `get_cash_payment`, `export_cash_payment_pdf` (`cash-payments.ts`),
 `delete_recurring_invoice` (`recurring-invoices.ts`),
 `get_tax`, `get_document_type`, `get_expense_category` (`config.ts`).
+
+`update_invoice`, `update_credit_note`, and `update_supplier_credit` must follow
+the PATCH-vs-draft-only-PUT caveat under "Update pattern" above rather than a
+plain `mergePut` — do not let item edits silently drop or delete lines.
+`export_bill_pdf` follows the same `getBinary` pattern as `export_invoice_pdf`;
+per the Elorus reference, the endpoint applies to self-billed invoices (bills
+the organization issues to itself), so the tool description should say so.
 
 Plus the cross-cutting work above (extend `notes.ts`, add `attachments.ts` and
 `sent-emails.ts`, applied-credit list/unapply, `client.ts` `getBinary` generalization).
