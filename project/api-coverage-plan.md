@@ -60,11 +60,17 @@ and `project`. That gets corrected in Phase 1.
   document types does not update line items or amounts, and full PUT replacement
   of items is only permitted while the document is a draft, requiring the
   complete item list including existing line IDs (omitting an existing ID
-  deletes that line). New update tools for these types (see Phase 1) must
-  either restrict item edits to draft-status documents with full, ID-preserving
-  item arrays, or support PATCH for non-item fields only and clearly document
-  that item changes need a separate, draft-only path — never silently drop or
-  delete lines. See https://developer.elorus.com/.
+  deletes that line). PATCH is also not a catch-all for "everything except
+  items" — per the v1.2 reference, invoice PATCH only accepts `custom_id`,
+  `draft`, `exchange_rate`, `payment_gateways`, and `trackingcategories`.
+  Fields like `date` or `client` are **not** PATCH-able and, like item edits,
+  require the draft-only full PUT path. `update_invoice`'s `inputSchema` must
+  therefore only expose that five-field PATCH allowlist as PATCH-safe; every
+  other field it accepts must route through the draft-only PUT path (or be
+  rejected outside draft status). Verify the equivalent PATCH allowlist for
+  credit notes and supplier credits against the spec before implementing
+  `update_credit_note`/`update_supplier_credit` — do not assume it matches
+  invoices' field set. See https://developer.elorus.com/.
 - **Void**: `client.put(`/…/{id}/void/`, { void: true })` — `invoices.ts:198-212`.
 - **Email**: GET `/…/{id}/email/` for defaults, merge caller overrides (cc/bcc via
   `splitEmailList`), POST merged body to same path — `invoices.ts:214-271`. This is

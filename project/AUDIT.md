@@ -3,16 +3,24 @@
 Branch: `codex/project-audit-2026-09-18`
 
 > **Historical snapshot.** This audit reflects the repository as of PR #6
-> (2026-09-18) and is kept for context, not as a live status report. All 11
-> findings below were subsequently addressed: findings 1–6 (void HTTP method,
-> invoice email route, notes/discussions routes, PDF binary handling,
-> cash-receipt payload, attachment path allowlist) in PR #7, "Fix API contract
-> mismatches and other issues from AUDIT.md" (commit `039f679`); findings 7–8
-> (mergePut writable-field allowlist, request timeout/retry) in `src/client.ts`;
-> and findings 9–11 (test/fixture exclusion from the published package, CI
-> gate, version sourced from `package.json`) via `tsconfig.build.json` and
-> `.github/workflows/ci.yml`. For current status, check the code and CI rather
-> than this file.
+> (2026-09-18) and is kept for context, not as a live status report. Findings
+> 1–6 (void HTTP method, invoice email route, notes/discussions routes, PDF
+> binary handling, cash-receipt payload, attachment path allowlist) were fully
+> addressed in PR #7, "Fix API contract mismatches and other issues from
+> AUDIT.md" (commit `039f679`). Finding 8 (request timeout/retry) and finding
+> 9 (test/fixture exclusion from the published package) are also fully
+> addressed, in `src/client.ts` and `tsconfig.build.json` respectively.
+> Finding 11 (version/metadata drift) is fixed — `src/index.ts` now sources
+> `version` from `package.json`. Findings 7 and 10 are only **partially**
+> addressed: `src/client.ts`'s `mergePut` now strips a generic
+> `READ_ONLY_RESPONSE_FIELDS` denylist before PUTting, which is narrower than
+> the per-resource writable-field allowlist finding 7 recommended — it can
+> still forward other server-managed fields and lose concurrent edits between
+> GET and PUT. And while `.github/workflows/ci.yml` now runs build/test/package
+> checks as a CI gate, finding 10's other recommendation — contract tests
+> derived from the v1.2 reference and a demo-org smoke suite — is still
+> missing; all tests remain mocked-`fetch` unit tests. For current status,
+> check the code and CI rather than this file.
 
 ## Scope and method
 
