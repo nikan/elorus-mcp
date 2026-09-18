@@ -1,5 +1,8 @@
 const { execFileSync } = require('node:child_process');
-const { readFileSync } = require('node:fs');
+const { createHash } = require('node:crypto');
+const { existsSync, readFileSync, writeFileSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 
 function git(...args) {
   return execFileSync('git', args, {
@@ -10,25 +13,32 @@ function git(...args) {
   }).trim();
 }
 
-function respond(message, blocked = false) {
-  const response = blocked
-    ? { decision: 'block', reason: message }
-    : {
-        hookSpecificOutput: {
-          hookEventName: 'UserPromptSubmit',
-          additionalContext: message,
-        },
-      };
-  process.stdout.write(JSON.stringify(response) + '\n');
+class Blocked extends Error {}
+
+function respond(message) {
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'UserPromptSubmit',
+      additionalContext: message,
+    },
+  }) + '\n');
 }
 
-try {
+function main() {
   const event = JSON.parse(readFileSync(0, 'utf8'));
   if (event.hook_event_name !== 'UserPromptSubmit') {
-    throw new Error('Unexpected hook event');
+    throw new Blocked('Unexpected hook event');
+  }
+  if (typeof event.session_id !== 'string' || !event.session_id) {
+    throw new Blocked('Hook input is missing a session ID.');
   }
 
-  git('rev-parse', '--show-toplevel');
+  const root = git('rev-parse', '--show-toplevel');
+  const marker = join(tmpdir(), 'elorus-origin-check-' + createHash('sha256')
+    .update(root + '\0' + event.session_id)
+    .digest('hex'));
+  if (existsSync(marker)) return;
+
   let branch;
   try {
     branch = git('symbolic-ref', '--quiet', '--short', 'HEAD');
@@ -42,11 +52,14 @@ try {
     upstream = null;
   }
   if (!upstream) {
-    upstream = git('symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD');
+    try {
+      upstream = git('symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD');
+    } catch {
+      throw new Blocked('No upstream is configured for this branch, and origin/HEAD is unavailable. Set an origin upstream before editing.');
+    }
   }
   if (!upstream.startsWith('origin/')) {
-    respond('The current branch tracks ' + upstream + ', not origin. Set an origin upstream before editing.', true);
-    process.exit(0);
+    throw new Blocked('The current branch tracks ' + upstream + ', not origin. Set an origin upstream before editing.');
   }
 
   git('fetch', '--quiet', '--no-tags', '--prune', 'origin');
@@ -57,20 +70,36 @@ try {
   if (!Number.isInteger(ahead) || !Number.isInteger(behind)) {
     throw new Error('Could not compare the local branch with its upstream');
   }
+  let message;
   if (behind === 0) {
-    respond(ahead === 0
+    message = ahead === 0
       ? 'Origin checked: this branch is current. Continue with the task and preserve any existing local changes.'
-      : 'Origin checked: this branch is current and has ' + ahead + ' unpushed local commit(s). Continue with the task.');
+      : 'Origin checked: this branch is current and has ' + ahead + ' unpushed local commit(s). Continue with the task.';
   } else if (!branch) {
-    respond('This detached checkout is behind ' + upstream + '. Create or switch to a branch before editing.', true);
+    throw new Blocked('This detached checkout is behind ' + upstream + '. Create or switch to a branch before editing.');
   } else if (ahead > 0) {
-    respond('The branch has diverged from ' + upstream + ' (' + ahead + ' ahead, ' + behind + ' behind). Merge or rebase manually before editing.', true);
+    throw new Blocked('The branch has diverged from ' + upstream + ' (' + ahead + ' ahead, ' + behind + ' behind). Merge or rebase manually before editing.');
   } else if (git('status', '--porcelain', '--untracked-files=normal')) {
-    respond('The branch is ' + behind + ' commit(s) behind ' + upstream + ', but this checkout has uncommitted changes. Save or commit them, then retry the task.', true);
+    throw new Blocked('The branch is ' + behind + ' commit(s) behind ' + upstream + ', but this checkout has uncommitted changes. Save or commit them, then retry the task.');
   } else {
-    git('pull', '--ff-only', 'origin', upstream.slice('origin/'.length));
-    respond('Pulled ' + behind + ' commit(s) from ' + upstream + '. Continue with the original task.');
+    git('merge', '--ff-only', upstream);
+    message = 'Fast-forwarded ' + behind + ' commit(s) from ' + upstream + '. Continue with the original task.';
   }
-} catch {
-  respond('Could not verify or fast-forward origin. Check the network, Git authentication, branch upstream, and checkout state, then retry the task.', true);
+
+  // A successful check is sufficient for this session. A blocked prompt is retried.
+  try {
+    writeFileSync(marker, '', { flag: 'wx' });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+  }
+  respond(message);
+}
+
+try {
+  main();
+} catch (error) {
+  process.stderr.write((error instanceof Blocked
+    ? error.message
+    : 'Could not verify or fast-forward origin. Check the network, Git authentication, branch upstream, and checkout state, then retry the task.') + '\n');
+  process.exitCode = 2;
 }
