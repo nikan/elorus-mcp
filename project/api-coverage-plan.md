@@ -235,6 +235,18 @@ in `update_invoice`/`update_credit_note`/`update_supplier_credit`, all fixed:
    records. `calculator_mode` genuinely persists via the draft-only full-PUT
    path on all three.
 
+A follow-up review round on the item-3 fix caught a fourth bug: the item
+validation loop ran *before* `mergePut`'s GET, using `calculator_mode ?? "initial"`
+— so updating a `total`-mode document with `unit_total` items while omitting
+`calculator_mode` was rejected locally even though the PUT would have retained
+the document's actual `total` mode. Fixed by moving the validation inside the
+`mergePut` callback, where `current` (the just-fetched record) is available:
+`calculator_mode ?? current.calculator_mode ?? "initial"`. This does mean an
+invalid `items` call with `calculator_mode` omitted now costs one GET before
+rejecting (previously it failed before any network call) — an unavoidable
+trade-off, since the correct mode to validate against isn't known until the
+GET completes.
+
 `update_invoice` follows the PATCH-vs-draft-only-PUT caveat under "Update
 pattern" above rather than a plain `mergePut` — do not let item edits silently
 drop or delete lines.

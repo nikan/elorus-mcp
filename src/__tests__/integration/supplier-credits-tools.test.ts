@@ -316,6 +316,45 @@ describe("supplier credit tools (list/apply)", () => {
     expect(body.calculator_mode).toBe("total");
   });
 
+  it("update_supplier_credit validates unit_total items against the document's current calculator_mode when the argument is omitted", async () => {
+    const current = { id: "sc-1", draft: true, date: "2026-07-01", calculator_mode: "total" };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_supplier_credit",
+      arguments: {
+        id: "sc-1",
+        items: [{ title: "Refund", quantity: "1", unit_total: "62.00", expense_category: "cat-1" }],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([
+      { description: "Refund", quantity: "1", unit_total: "62.00", expense_category: "cat-1" },
+    ]);
+    expect(body.calculator_mode).toBe("total");
+  });
+
   it("delete_supplier_credit DELETEs /suppliercredits/{id}/", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

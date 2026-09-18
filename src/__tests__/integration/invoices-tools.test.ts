@@ -377,6 +377,27 @@ describe("invoice tools (handler-level)", () => {
     expect(body.calculator_mode).toBe("total");
   });
 
+  it("update_invoice validates unit_total items against the document's current calculator_mode when the argument is omitted", async () => {
+    const current = { id: "inv-1", draft: true, date: "2026-07-01", calculator_mode: "total" };
+    const mockFetch = mockFetchSequence([current, current]);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: {
+        id: "inv-1",
+        items: [{ title: "Consulting", quantity: "5", unit_total: "124.00" }],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([{ title: "Consulting", quantity: "5", unit_total: "124.00" }]);
+    expect(body.calculator_mode).toBe("total");
+  });
+
   it("delete_invoice DELETEs /invoices/{id}/", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

@@ -238,8 +238,9 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe(
             "'initial' means each item must have unit_value; 'total' means each item must have unit_total. " +
-              "Validates items when provided, and is itself persisted on the invoice — Draft-only, requires " +
-              "a full PUT even when items is omitted."
+              "Validates items against this mode when provided; when omitted, items are validated against " +
+              "the invoice's current calculator_mode instead. Itself persisted on the invoice — Draft-only, " +
+              "requires a full PUT even when items is omitted."
           ),
         currency_code: z
           .string()
@@ -299,22 +300,6 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         };
       }
 
-      if (items) {
-        const mode = calculator_mode ?? "initial";
-        items.forEach((item, i) => {
-          if (mode === "initial" && !item.unit_value) {
-            throw new Error(
-              `items[${i}]: calculator_mode 'initial' requires unit_value (price before tax) on each line item`
-            );
-          }
-          if (mode === "total" && !item.unit_total) {
-            throw new Error(
-              `items[${i}]: calculator_mode 'total' requires unit_total (price after tax) on each line item`
-            );
-          }
-        });
-      }
-
       const result = await client.mergePut(`/invoices/${id}/`, (current) => {
         if (current.draft !== true) {
           throw new Error(
@@ -322,6 +307,22 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
               "these fields are only editable while the invoice is a draft. Only custom_id, draft, " +
               "exchange_rate, payment_gateways, and trackingcategories can be changed once an invoice is issued."
           );
+        }
+        if (items) {
+          const mode =
+            calculator_mode ?? (typeof current.calculator_mode === "string" ? current.calculator_mode : "initial");
+          items.forEach((item, i) => {
+            if (mode === "initial" && !item.unit_value) {
+              throw new Error(
+                `items[${i}]: calculator_mode 'initial' requires unit_value (price before tax) on each line item`
+              );
+            }
+            if (mode === "total" && !item.unit_total) {
+              throw new Error(
+                `items[${i}]: calculator_mode 'total' requires unit_total (price after tax) on each line item`
+              );
+            }
+          });
         }
         const overrides: Record<string, unknown> = {};
         if (custom_id !== undefined) overrides.custom_id = custom_id;
