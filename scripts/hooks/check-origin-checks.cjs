@@ -103,6 +103,17 @@ test('blocks a diverged branch with exit code 2', (t) => {
   assert.match(blocked.stderr, /has diverged/);
 });
 
+test('blocks a detached checkout behind origin', (t) => {
+  const { local, peer, advance, run } = fixture(t);
+  git(local, 'checkout', '--detach');
+  advance(peer);
+  git(peer, 'push', 'origin', 'main');
+
+  const blocked = run('detached-session');
+  assert.equal(blocked.status, 2);
+  assert.match(blocked.stderr, /detached checkout is behind/);
+});
+
 test('explains when neither an upstream nor origin/HEAD exists', (t) => {
   const { local, run } = fixture(t);
   git(local, 'branch', '--unset-upstream');

@@ -20,6 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      - run: node --test scripts/hooks/check-origin-checks.cjs
       - name: Verify published package excludes tests and fixtures
         run: |
           FILES=$(npm pack --dry-run --json | node -e "
