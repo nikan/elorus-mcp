@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/scripts/hooks/check-origin.cjs"
+            ],
+            "timeout": 90,
+            "statusMessage": "Checking origin before work"
+          }
+        ]
+      }
+    ]
+  }
+}
