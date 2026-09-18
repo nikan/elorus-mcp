@@ -310,6 +310,21 @@ describe("invoice tools (handler-level)", () => {
     expect(mockFetch.mock.calls[0][1]?.method).toBeUndefined();
   });
 
+  it("update_invoice rejects calculator_mode alone when the invoice is not a draft, without an empty PATCH", async () => {
+    const current = { id: "inv-1", draft: false, date: "2026-07-01" };
+    const mockFetch = mockFetchSequence([current]);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", calculator_mode: "total" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0][1]?.method).toBeUndefined();
+  });
+
   it("update_invoice rejects an items line missing unit_value under calculator_mode 'initial' without reaching the API", async () => {
     const mockFetch = mockFetchWith({});
     const client = await connectedClient(elorusClient);
@@ -321,6 +336,45 @@ describe("invoice tools (handler-level)", () => {
 
     expect(result.isError).toBe(true);
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("update_invoice preserves an existing line item's id in the outgoing PUT body", async () => {
+    const current = { id: "inv-1", draft: true, date: "2026-07-01" };
+    const mockFetch = mockFetchSequence([current, { ...current }]);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: {
+        id: "inv-1",
+        items: [{ id: "line-1", title: "Consulting", quantity: "5", unit_value: "100.00" }],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([
+      { id: "line-1", title: "Consulting", quantity: "5", unit_value: "100.00" },
+    ]);
+  });
+
+  it("update_invoice persists calculator_mode on the draft-only PUT path", async () => {
+    const current = { id: "inv-1", draft: true, date: "2026-07-01", calculator_mode: "initial" };
+    const mockFetch = mockFetchSequence([current, { ...current, calculator_mode: "total" }]);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", calculator_mode: "total" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.calculator_mode).toBe("total");
   });
 
   it("delete_invoice DELETEs /invoices/{id}/", async () => {

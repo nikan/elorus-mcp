@@ -210,6 +210,31 @@ when using the current schema, and via a successful create once
 equivalent fix. As shipped, `create_supplier_credit` will be rejected by the
 real API.
 
+**PR review follow-up, resolved:** a review of the Phase 1 PR flagged three bugs
+in `update_invoice`/`update_credit_note`/`update_supplier_credit`, all fixed:
+1. Their shared `items` schema didn't declare `id`, so Zod stripped any `id` a
+   caller supplied before the PUT, silently deleting and recreating existing
+   lines. Fixed via `lineItemUpdateSchema`/`billLineItemUpdateSchema`
+   (`src/schemas/line-item.ts`, `src/schemas/bill-line-item.ts`) — update-only
+   variants of the create schemas with an optional `id` field.
+2. `update_supplier_credit`'s `items` used the invoice-style `lineItemSchema`
+   shape instead of the bill-style shape supplier credits actually need
+   (`description`, required `expense_category` — see the `create_supplier_credit`
+   known issue below). Fixed by switching to `billLineItemUpdateSchema` plus the
+   same `title`→`description` remap `create_bill` uses. `create_supplier_credit`
+   itself is unchanged and still has the known issue below.
+3. `calculator_mode` was validated against `items` locally but never written to
+   the PUT body, so changing it silently had no effect, and a `calculator_mode`-
+   only call (no other draft-only field) fell through to the PATCH path and sent
+   an empty body while appearing to succeed. Fixed by adding it to each tool's
+   draft-only-field check and PUT overrides. **Verified live** (`.env.dev`,
+   `ELORUS_DEMO=1`): created a disposable draft invoice/credit note/supplier
+   credit with `calculator_mode: "initial"`, PUT `calculator_mode: "total"`
+   via the same GET-merge-PUT shape `mergePut` uses, and confirmed `"total"`
+   via a separate GET on all three resource types before deleting the test
+   records. `calculator_mode` genuinely persists via the draft-only full-PUT
+   path on all three.
+
 `update_invoice` follows the PATCH-vs-draft-only-PUT caveat under "Update
 pattern" above rather than a plain `mergePut` — do not let item edits silently
 drop or delete lines.

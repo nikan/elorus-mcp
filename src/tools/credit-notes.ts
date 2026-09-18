@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { lineItemSchema } from "../schemas/line-item.js";
+import { lineItemSchema, lineItemUpdateSchema } from "../schemas/line-item.js";
 import { splitEmailList } from "../email.js";
 
 export function registerCreditNoteTools(server: McpServer, client: ElorusClient): void {
@@ -72,10 +72,10 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
         "Update fields on an existing credit note. custom_id and draft are PATCH-safe and can be " +
         "changed regardless of status (verified live: every other PATCH field tested — date, client, " +
         "notes — returns 200 but silently has no effect). Every other field here — date, client, " +
-        "documenttype, items, currency_code, exchange_rate, notes — is only editable while the credit " +
-        "note is still a draft, and is applied via a full PUT rather than PATCH. Updating items this " +
-        "way REPLACES THE ENTIRE LINE LIST: include every existing line's id you want to keep, or that " +
-        "line is deleted.",
+        "documenttype, items, calculator_mode, currency_code, exchange_rate, notes — is only editable " +
+        "while the credit note is still a draft, and is applied via a full PUT rather than PATCH. " +
+        "Updating items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id you " +
+        "want to keep, or that line is deleted.",
       inputSchema: {
         id: z.string().describe("The Elorus credit note ID to update"),
         custom_id: z.string().optional().describe("Custom/external ID for this credit note (PATCH-safe, any status)"),
@@ -93,7 +93,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
           .optional()
           .describe("Document type ID (obtain from list_document_types). Draft-only — requires a full PUT."),
         items: z
-          .array(lineItemSchema)
+          .array(lineItemUpdateSchema)
           .min(1)
           .optional()
           .describe(
@@ -105,7 +105,8 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
           .optional()
           .describe(
             "'initial' means each item must have unit_value; 'total' means each item must have unit_total. " +
-              "Only relevant when items is provided."
+              "Validates items when provided, and is itself persisted on the credit note — Draft-only, " +
+              "requires a full PUT even when items is omitted."
           ),
         currency_code: z
           .string()
@@ -134,6 +135,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
         clientId !== undefined ||
         documenttype !== undefined ||
         items !== undefined ||
+        calculator_mode !== undefined ||
         currency_code !== undefined ||
         exchange_rate !== undefined ||
         notes !== undefined;
@@ -163,8 +165,8 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
       const result = await client.mergePut(`/creditnotes/${id}/`, (current) => {
         if (current.draft !== true) {
           throw new Error(
-            `Cannot update date/client/documenttype/items/currency_code/exchange_rate/notes on credit ` +
-              `note ${id}: these fields are only editable while the credit note is a draft. Only ` +
+            `Cannot update date/client/documenttype/items/calculator_mode/currency_code/exchange_rate/notes ` +
+              `on credit note ${id}: these fields are only editable while the credit note is a draft. Only ` +
               "custom_id and draft can be changed once a credit note is issued."
           );
         }
@@ -175,6 +177,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
         if (clientId !== undefined) overrides.client = clientId;
         if (documenttype !== undefined) overrides.documenttype = documenttype;
         if (items !== undefined) overrides.items = items;
+        if (calculator_mode !== undefined) overrides.calculator_mode = calculator_mode;
         if (currency_code !== undefined) overrides.currency_code = currency_code;
         if (exchange_rate !== undefined) overrides.exchange_rate = exchange_rate;
         if (notes !== undefined) overrides.public_notes = notes;

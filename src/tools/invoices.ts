@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { lineItemSchema } from "../schemas/line-item.js";
+import { lineItemSchema, lineItemUpdateSchema } from "../schemas/line-item.js";
 import { splitEmailList } from "../email.js";
 
 export function registerInvoiceTools(server: McpServer, client: ElorusClient): void {
@@ -193,10 +193,10 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
       description:
         "Update fields on an existing invoice. custom_id, draft, exchange_rate, payment_gateways, and " +
         "trackingcategories are PATCH-safe and can be changed regardless of status. Every other field " +
-        "here — date, client, documenttype, items, currency_code, due_date, notes — is only editable " +
-        "while the invoice is still a draft, and is applied via a full PUT rather than PATCH. Updating " +
-        "items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id you want to " +
-        "keep, or that line is deleted.",
+        "here — date, client, documenttype, items, calculator_mode, currency_code, due_date, notes — is " +
+        "only editable while the invoice is still a draft, and is applied via a full PUT rather than " +
+        "PATCH. Updating items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id " +
+        "you want to keep, or that line is deleted.",
       inputSchema: {
         id: z.string().describe("The Elorus invoice ID to update"),
         custom_id: z.string().optional().describe("Custom/external ID for this invoice (PATCH-safe, any status)"),
@@ -226,7 +226,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe("Document type ID (obtain from list_document_types). Draft-only — requires a full PUT."),
         items: z
-          .array(lineItemSchema)
+          .array(lineItemUpdateSchema)
           .min(1)
           .optional()
           .describe(
@@ -238,7 +238,8 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
           .optional()
           .describe(
             "'initial' means each item must have unit_value; 'total' means each item must have unit_total. " +
-              "Only relevant when items is provided."
+              "Validates items when provided, and is itself persisted on the invoice — Draft-only, requires " +
+              "a full PUT even when items is omitted."
           ),
         currency_code: z
           .string()
@@ -280,6 +281,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         clientId !== undefined ||
         documenttype !== undefined ||
         items !== undefined ||
+        calculator_mode !== undefined ||
         currency_code !== undefined ||
         due_date !== undefined ||
         notes !== undefined;
@@ -316,7 +318,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
       const result = await client.mergePut(`/invoices/${id}/`, (current) => {
         if (current.draft !== true) {
           throw new Error(
-            `Cannot update date/client/documenttype/items/currency_code/due_date/notes on invoice ${id}: ` +
+            `Cannot update date/client/documenttype/items/calculator_mode/currency_code/due_date/notes on invoice ${id}: ` +
               "these fields are only editable while the invoice is a draft. Only custom_id, draft, " +
               "exchange_rate, payment_gateways, and trackingcategories can be changed once an invoice is issued."
           );
@@ -331,6 +333,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         if (clientId !== undefined) overrides.client = clientId;
         if (documenttype !== undefined) overrides.documenttype = documenttype;
         if (items !== undefined) overrides.items = items;
+        if (calculator_mode !== undefined) overrides.calculator_mode = calculator_mode;
         if (currency_code !== undefined) overrides.currency_code = currency_code;
         if (notes !== undefined) overrides.public_notes = notes;
         if (due_date !== undefined) {

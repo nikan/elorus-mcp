@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
 import { lineItemSchema } from "../schemas/line-item.js";
+import { billLineItemUpdateSchema } from "../schemas/bill-line-item.js";
 import { splitEmailList } from "../email.js";
 
 export function registerSupplierCreditTools(server: McpServer, client: ElorusClient): void {
@@ -72,10 +73,12 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
         "Update fields on an existing supplier credit. custom_id and draft are PATCH-safe and can be " +
         "changed regardless of status (verified live: every other PATCH field tested — date, reference, " +
         "notes — returns 200 but silently has no effect). Every other field here — date, supplier, " +
-        "documenttype, items, currency_code, exchange_rate, notes, reference — is only editable while " +
-        "the supplier credit is still a draft, and is applied via a full PUT rather than PATCH. Updating " +
-        "items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id you want to " +
-        "keep, or that line is deleted.",
+        "documenttype, items, calculator_mode, currency_code, exchange_rate, notes, reference — is only " +
+        "editable while the supplier credit is still a draft, and is applied via a full PUT rather than " +
+        "PATCH. Updating items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id " +
+        "you want to keep, or that line is deleted. Line items use the same shape as bills — supply " +
+        "title (mapped to the API's description) and a required expense_category per line, not the " +
+        "invoice-style shape.",
       inputSchema: {
         id: z.string().describe("The Elorus supplier credit ID to update"),
         custom_id: z
@@ -99,19 +102,23 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
           .optional()
           .describe("Document type ID (obtain from list_document_types). Draft-only — requires a full PUT."),
         items: z
-          .array(lineItemSchema)
+          .array(billLineItemUpdateSchema)
           .min(1)
           .optional()
           .describe(
-            "Full replacement line item list — include every existing line's id to keep it, since any " +
-              "existing line whose id is omitted is deleted. Draft-only — requires a full PUT."
+            "Full replacement line item list, using the same shape as bills (title, quantity, " +
+              "unit_value/unit_total, expense_category, taxes, discount, product) — supplier credit " +
+              "items require expense_category and are sent to the API as description, not title. " +
+              "Include every existing line's id to keep it, since any existing line whose id is omitted " +
+              "is deleted. Draft-only — requires a full PUT."
           ),
         calculator_mode: z
           .enum(["initial", "total"])
           .optional()
           .describe(
             "'initial' means each item must have unit_value; 'total' means each item must have unit_total. " +
-              "Only relevant when items is provided."
+              "Validates items when provided, and is itself persisted on the supplier credit — Draft-only, " +
+              "requires a full PUT even when items is omitted."
           ),
         currency_code: z
           .string()
@@ -159,6 +166,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
         supplier !== undefined ||
         documenttype !== undefined ||
         items !== undefined ||
+        calculator_mode !== undefined ||
         currency_code !== undefined ||
         exchange_rate !== undefined ||
         notes !== undefined ||
@@ -189,8 +197,8 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
       const result = await client.mergePut(`/suppliercredits/${id}/`, (current) => {
         if (current.draft !== true) {
           throw new Error(
-            `Cannot update date/supplier/documenttype/items/currency_code/exchange_rate/notes/reference ` +
-              `on supplier credit ${id}: these fields are only editable while the supplier credit is a ` +
+            `Cannot update date/supplier/documenttype/items/calculator_mode/currency_code/exchange_rate/` +
+              `notes/reference on supplier credit ${id}: these fields are only editable while the supplier credit is a ` +
               "draft. Only custom_id and draft can be changed once a supplier credit is issued."
           );
         }
@@ -200,7 +208,10 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
         if (date !== undefined) overrides.date = date;
         if (supplier !== undefined) overrides.supplier = supplier;
         if (documenttype !== undefined) overrides.documenttype = documenttype;
-        if (items !== undefined) overrides.items = items;
+        if (items !== undefined) {
+          overrides.items = items.map(({ title, ...item }) => ({ ...item, description: title }));
+        }
+        if (calculator_mode !== undefined) overrides.calculator_mode = calculator_mode;
         if (currency_code !== undefined) overrides.currency_code = currency_code;
         if (exchange_rate !== undefined) overrides.exchange_rate = exchange_rate;
         if (notes !== undefined) overrides.public_notes = notes;

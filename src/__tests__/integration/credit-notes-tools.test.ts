@@ -208,6 +208,97 @@ describe("credit note tools (list/apply)", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("update_credit_note rejects calculator_mode alone when not a draft, without an empty PATCH", async () => {
+    const current = { id: "cn-1", draft: false, date: "2026-07-01" };
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers(),
+      json: () => Promise.resolve(current),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_credit_note",
+      arguments: { id: "cn-1", calculator_mode: "total" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0][1]?.method).toBeUndefined();
+  });
+
+  it("update_credit_note preserves an existing line item's id in the outgoing PUT body", async () => {
+    const current = { id: "cn-1", draft: true, date: "2026-07-01" };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_credit_note",
+      arguments: {
+        id: "cn-1",
+        items: [{ id: "line-1", title: "Refund", quantity: "1", unit_value: "50.00" }],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([{ id: "line-1", title: "Refund", quantity: "1", unit_value: "50.00" }]);
+  });
+
+  it("update_credit_note persists calculator_mode on the draft-only PUT path", async () => {
+    const current = { id: "cn-1", draft: true, date: "2026-07-01", calculator_mode: "initial" };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve({ ...current, calculator_mode: "total" }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_credit_note",
+      arguments: { id: "cn-1", calculator_mode: "total" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.calculator_mode).toBe("total");
+  });
+
   it("delete_credit_note DELETEs /creditnotes/{id}/", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
