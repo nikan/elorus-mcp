@@ -79,6 +79,7 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `get_contact` | Fetch a contact by ID |
 | `create_contact` | Create a client, supplier, or both |
 | `update_contact` | Update fields on an existing contact |
+| `delete_contact` | Permanently delete a contact |
 
 ### Invoices
 | Tool | Description |
