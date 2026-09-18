@@ -141,7 +141,10 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
           .describe(
             "Document type ID (obtain from list_document_types). May be required depending on your organization's configuration."
           ),
-        sequence: z.string().optional().describe("Numbering sequence ID for generated invoices"),
+        sequence_flat: z
+          .string()
+          .optional()
+          .describe("Numbering sequence NAME (not ID) for generated invoices, e.g. 'SEQ-A'"),
         draft: z
           .boolean()
           .optional()
@@ -231,7 +234,10 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
             "When the schedule should stop generating invoices, as an ISO 8601 date-time. Omit/leave unset for no expiry."
           ),
         documenttype: z.string().optional().describe("Document type ID (obtain from list_document_types)"),
-        sequence: z.string().optional().describe("Numbering sequence ID for generated invoices"),
+        sequence_flat: z
+          .string()
+          .optional()
+          .describe("Numbering sequence NAME (not ID) for generated invoices, e.g. 'SEQ-A'"),
         draft: z
           .boolean()
           .optional()

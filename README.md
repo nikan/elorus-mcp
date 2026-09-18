@@ -23,7 +23,7 @@ npx elorus-mcp
 Or clone and build locally:
 
 ```bash
-git clone https://github.com/your-org/elorus-mcp
+git clone https://github.com/nikan/elorus-mcp
 cd elorus-mcp
 npm install && npm run build
 ```
@@ -66,6 +66,7 @@ cp .env.example .env
 | `ELORUS_API_KEY` | Yes | Your Elorus API key |
 | `ELORUS_ORG_ID` | Yes | Your Elorus organization ID |
 | `ELORUS_DEMO` | No | Set to `1` to send `X-Elorus-Demo: 1` on all requests (targets Elorus's demo/sandbox environment) |
+| `ELORUS_ATTACHMENT_ROOT` | No | Directory this server is allowed to read local files from for `add_bill_attachment`/`add_expense_attachment`'s `file_path` option. Unset by default, which disables `file_path` entirely (use `content_base64` instead) |
 
 Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Code) with its own `env` block, that `env` block takes precedence and `.env` is not read — only `npm start` invokes `node --env-file=.env`. Keep credentials in one place to avoid the two silently diverging.
 
@@ -87,7 +88,7 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `create_invoice` | Create a sales invoice with line items and taxes |
 | `void_invoice` | Void an invoice (excluded from financial reports, cannot be edited or paid) |
 | `send_invoice_email` | Email an invoice to the client |
-| `export_invoice_pdf` | Export an invoice as a PDF (returns a download URL) |
+| `export_invoice_pdf` | Export an invoice as a PDF (returns the file content directly, base64-encoded) |
 
 ### Recurring invoices
 | Tool | Description |
@@ -106,17 +107,18 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `get_bill` | Fetch a bill by ID |
 | `create_bill` | Create a supplier bill with line items and taxes |
 | `update_bill` | Update fields on an existing bill |
+| `add_bill_attachment` | Attach a file (e.g. a scanned receipt or supplier bill PDF) to an existing bill, via `file_path` (see `ELORUS_ATTACHMENT_ROOT` above) or `content_base64` |
 | `void_bill` | Void a bill |
 
 ### Expenses
 | Tool | Description |
 |---|---|
-| `list_expenses` | Filter expense records by supplier, category, or date range |
+| `list_expenses` | Filter expense records by supplier or date range |
 | `get_expense` | Fetch an expense by ID |
 | `create_expense` | Record a new business expense. Line items use `expense_category`/`amount`/`description` (not the invoice-style `title`/`quantity`/`unit_value`) |
 | `update_expense` | Update fields on an existing expense |
-| `add_expense_attachment` | Attach a file (e.g. a receipt or supplier invoice PDF) to an existing expense, given base64-encoded content |
-| `export_expense_pdf` | Export an expense document as a PDF (returns a download URL) |
+| `add_expense_attachment` | Attach a file (e.g. a receipt or supplier invoice PDF) to an existing expense, via `file_path` (see `ELORUS_ATTACHMENT_ROOT` above) or `content_base64` |
+| `export_expense_pdf` | Export an expense document as a PDF (returns the file content directly, base64-encoded) |
 
 ### Credit notes (issued to clients)
 | Tool | Description |
@@ -137,7 +139,7 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 |---|---|
 | `list_cash_receipts` | Filter by client, invoice, or date range |
 | `record_cash_receipt` | Record a payment received from a client, optionally linked to an invoice |
-| `export_cash_receipt_pdf` | Export a cash receipt as a PDF (returns a download URL) |
+| `export_cash_receipt_pdf` | Export a cash receipt as a PDF (returns the file content directly, base64-encoded) |
 
 ### Cash payments (payments made to suppliers)
 | Tool | Description |
@@ -161,7 +163,7 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `list_private_notes` | List internal notes on a resource (visible only to organization members) |
 | `create_private_note` | Add an internal note to a resource |
 | `list_client_discussions` | List client-visible discussion messages on a resource |
-| `create_client_discussion` | Post a client-visible message on an invoice or cash receipt |
+| `create_client_discussion` | Post a client-visible message on an invoice or credit note |
 
 ### Configuration lookups
 | Tool | Description |

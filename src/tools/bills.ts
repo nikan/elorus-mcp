@@ -1,8 +1,8 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { readAttachmentFile } from "../attachments.js";
 import { billLineItemSchema } from "../schemas/bill-line-item.js";
 
 export function registerBillTools(server: McpServer, client: ElorusClient): void {
@@ -179,20 +179,21 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
     {
       description:
         "Attach a file (e.g. a scanned receipt or supplier bill PDF) to an existing bill. " +
-        "Provide EITHER file_path (read directly off this machine's local disk — e.g. a PDF a " +
-        "Collect run already saved into the accounting folder) OR content_base64 (raw bytes " +
-        "supplied by the caller). Prefer file_path whenever the file already exists on disk: it " +
-        "avoids pushing a large base64 string through the calling client. By default the " +
-        "attachment is set as the primary receipt (the document shown in the bill's receipt panel).",
+        "Provide EITHER file_path (read directly off this machine's local disk, restricted to the " +
+        "directory tree configured via the ELORUS_ATTACHMENT_ROOT environment variable) OR " +
+        "content_base64 (raw bytes supplied by the caller). Prefer file_path whenever the file already " +
+        "exists on disk under that root: it avoids pushing a large base64 string through the calling " +
+        "client. By default the attachment is set as the primary receipt (the document shown in the " +
+        "bill's receipt panel).",
       inputSchema: {
         id: z.string().describe("The Elorus bill ID to attach the file to"),
         file_path: z
           .string()
           .optional()
           .describe(
-            "Absolute path to a file already on this machine's local disk, e.g. " +
-              "'C:\\\\Users\\\\nanag\\\\OneDrive\\\\Professional\\\\PLS\\\\Accounting\\\\FY2026-27\\\\bill.pdf'. " +
-              "Read directly from disk — use this instead of content_base64 whenever the file already exists locally."
+            "Absolute path to a file already on this machine's local disk, under the directory " +
+              "configured via ELORUS_ATTACHMENT_ROOT. Use this instead of content_base64 whenever the " +
+              "file already exists locally."
           ),
         filename: z
           .string()
@@ -222,7 +223,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
       let buffer: Buffer;
       let resolvedFilename: string;
       if (file_path) {
-        buffer = fs.readFileSync(file_path);
+        buffer = await readAttachmentFile(file_path);
         resolvedFilename = filename ?? path.basename(file_path);
       } else if (content_base64) {
         if (!filename) {
@@ -255,7 +256,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
       },
     },
     async ({ id }) => {
-      const result = await client.post(`/bills/${id}/void/`, {});
+      const result = await client.put(`/bills/${id}/void/`, { void: true });
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

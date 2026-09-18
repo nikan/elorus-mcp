@@ -41,11 +41,11 @@ describe("invoices integration (fixture)", () => {
     expect(result.items[0].title).toBe("Consulting services");
   });
 
-  it("void_invoice POSTs to void endpoint and handles 200", async () => {
+  it("void_invoice PUTs to void endpoint and handles 200", async () => {
     const voided = { ...invoicesFixture.results[0], status: "void" };
     mockFetchWith(voided);
 
-    const result = await client.post<typeof voided>("/invoices/2000000001/void/", {});
+    const result = await client.put<typeof voided>("/invoices/2000000001/void/", { void: true });
     expect(result.status).toBe("void");
   });
 
@@ -58,7 +58,7 @@ describe("invoices integration (fixture)", () => {
       json: () => Promise.reject(new Error("no body")),
     }));
 
-    const result = await client.post("/invoices/2000000001/void/", {});
+    const result = await client.put("/invoices/2000000001/void/", { void: true });
     expect(result).toEqual({});
   });
 

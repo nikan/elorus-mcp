@@ -70,7 +70,7 @@ describe("bill tools (list/get/void/update)", () => {
     expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/");
   });
 
-  it("void_bill POSTs to the void sub-resource", async () => {
+  it("void_bill PUTs {void: true} to the void sub-resource", async () => {
     const mockFetch = mockFetchWith({ id: "bill-1", status: "void" });
     const client = await connectedClient(elorusClient);
 
@@ -79,7 +79,8 @@ describe("bill tools (list/get/void/update)", () => {
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/void/");
-    expect(options.method).toBe("POST");
+    expect(options.method).toBe("PUT");
+    expect(JSON.parse(options.body as string)).toEqual({ void: true });
   });
 
   it("create_bill POSTs items with title remapped to description", async () => {

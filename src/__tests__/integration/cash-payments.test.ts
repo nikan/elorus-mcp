@@ -62,7 +62,6 @@ describe("cash payment tools", () => {
         supplier: "sup-1",
         date: "2026-07-01",
         amount: "250.00",
-        payment_method: "2",
         bill: "bill-1",
       },
     });
@@ -74,7 +73,6 @@ describe("cash payment tools", () => {
       contact: "sup-1",
       date: "2026-07-01",
       amount: "250.00",
-      payment_method: "2",
       transaction_type: "ip",
       purchase_payments: [{ purchase: "bill-1", amount: "250.00" }],
     });
@@ -86,7 +84,7 @@ describe("cash payment tools", () => {
 
     await client.callTool({
       name: "record_cash_payment",
-      arguments: { supplier: "sup-1", date: "2026-07-01", amount: "100.00", payment_method: "2" },
+      arguments: { supplier: "sup-1", date: "2026-07-01", amount: "100.00" },
     });
 
     const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];

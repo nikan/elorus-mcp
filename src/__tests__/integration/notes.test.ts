@@ -36,8 +36,8 @@ describe("note & discussion tools", () => {
     vi.unstubAllGlobals();
   });
 
-  it("list_private_notes maps resource_type/resource_id to content_type/object_id query params", async () => {
-    const mockFetch = mockFetchWith({ count: 0, results: [] });
+  it("list_private_notes GETs the resource's nested notes sub-resource", async () => {
+    const mockFetch = mockFetchWith([]);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -47,49 +47,38 @@ describe("note & discussion tools", () => {
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    const parsed = new URL(url);
-    expect(parsed.pathname).toBe("/v1.2/privatenotes/");
-    expect(parsed.searchParams.get("content_type")).toBe("invoice");
-    expect(parsed.searchParams.get("object_id")).toBe("inv-1");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/notes/");
   });
 
-  it("create_private_note POSTs content_type/object_id/title/body to /privatenotes/", async () => {
+  it("create_private_note POSTs {notes: body} to the resource's nested notes sub-resource", async () => {
     const mockFetch = mockFetchWith({ id: "note-1" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "create_private_note",
-      arguments: { resource_type: "contact", resource_id: "c-1", title: "Reminder", body: "Call back" },
+      arguments: { resource_type: "contact", resource_id: "c-1", body: "Call back" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/privatenotes/");
-    expect(JSON.parse(options.body as string)).toEqual({
-      content_type: "contact",
-      object_id: "c-1",
-      title: "Reminder",
-      body: "Call back",
-    });
+    expect(url).toBe("https://api.elorus.com/v1.2/contacts/c-1/notes/");
+    expect(JSON.parse(options.body as string)).toEqual({ notes: "Call back" });
   });
 
-  it("list_client_discussions maps resource_type/resource_id to content_type/object_id query params", async () => {
-    const mockFetch = mockFetchWith({ count: 0, results: [] });
+  it("list_client_discussions GETs the resource's nested discussions sub-resource", async () => {
+    const mockFetch = mockFetchWith([]);
     const client = await connectedClient(elorusClient);
 
     await client.callTool({
       name: "list_client_discussions",
-      arguments: { resource_type: "cashreceipt", resource_id: "cr-1" },
+      arguments: { resource_type: "invoice", resource_id: "inv-1" },
     });
 
     const [url] = mockFetch.mock.calls[0] as [string];
-    const parsed = new URL(url);
-    expect(parsed.pathname).toBe("/v1.2/clientdiscussions/");
-    expect(parsed.searchParams.get("content_type")).toBe("cashreceipt");
-    expect(parsed.searchParams.get("object_id")).toBe("cr-1");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/discussions/");
   });
 
-  it("create_client_discussion POSTs content_type/object_id/body to /clientdiscussions/", async () => {
+  it("create_client_discussion POSTs {message: body} to the resource's nested discussions sub-resource", async () => {
     const mockFetch = mockFetchWith({ id: "disc-1" }, 201);
     const client = await connectedClient(elorusClient);
 
@@ -100,12 +89,8 @@ describe("note & discussion tools", () => {
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/clientdiscussions/");
-    expect(JSON.parse(options.body as string)).toEqual({
-      content_type: "invoice",
-      object_id: "inv-1",
-      body: "Thanks for your business",
-    });
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/discussions/");
+    expect(JSON.parse(options.body as string)).toEqual({ message: "Thanks for your business" });
   });
 
   it("rejects an unsupported resource_type for client discussions without reaching the API", async () => {
@@ -114,7 +99,7 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "list_client_discussions",
-      arguments: { resource_type: "bill", resource_id: "b-1" },
+      arguments: { resource_type: "cashreceipt", resource_id: "cr-1" },
     });
 
     expect(result.isError).toBe(true);

@@ -71,31 +71,36 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
           .string()
           .optional()
           .describe("Product code or SKU for internal reference"),
-        sale_price: z
+        sale_value: z
           .string()
           .optional()
           .describe("Default selling price before tax as a string, e.g. '99.99'"),
-        purchase_price: z
+        purchase_value: z
           .string()
           .optional()
           .describe("Default purchase/cost price before tax as a string, e.g. '60.00'"),
-        taxes: z
+        sale_taxes: z
           .array(z.string())
           .optional()
-          .describe(
-            "Array of tax IDs to apply by default on this product (obtain IDs via list_taxes)"
-          ),
-        unit: z
+          .describe("Array of tax IDs applied by default when selling this product (obtain IDs via list_taxes)"),
+        purchase_taxes: z
+          .array(z.string())
+          .optional()
+          .describe("Array of tax IDs applied by default when purchasing this product (obtain IDs via list_taxes)"),
+        unit_measure: z
           .string()
           .optional()
           .describe(
-            "Unit of measurement ID (obtain from list_units), e.g. hours, pieces, kg"
+            "Unit of measurement symbol, e.g. 'hour', 'item', 'kg' — either a built-in symbol or a custom " +
+              "unit's symbol (obtain from list_units)"
           ),
-        notes: z.string().optional().describe("Internal notes about this product"),
       },
     },
-    async (args) => {
-      const result = await client.post("/products/", args);
+    async ({ sale_value, purchase_value, ...rest }) => {
+      const body: Record<string, unknown> = { ...rest, sale_value, purchase_value };
+      if (sale_value !== undefined) body.sales = true;
+      if (purchase_value !== undefined) body.purchases = true;
+      const result = await client.post("/products/", body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -113,15 +118,21 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
         title: z.string().optional().describe("Product or service name"),
         description: z.string().optional().describe("Detailed description"),
         code: z.string().optional().describe("Product code or SKU"),
-        sale_price: z.string().optional().describe("Default selling price before tax, e.g. '99.99'"),
-        purchase_price: z.string().optional().describe("Default purchase/cost price before tax, e.g. '60.00'"),
-        taxes: z.array(z.string()).optional().describe("Array of tax IDs (obtain via list_taxes)"),
-        unit: z.string().optional().describe("Unit of measurement ID (obtain from list_units)"),
-        notes: z.string().optional().describe("Internal notes"),
+        sale_value: z.string().optional().describe("Default selling price before tax, e.g. '99.99'"),
+        purchase_value: z.string().optional().describe("Default purchase/cost price before tax, e.g. '60.00'"),
+        sale_taxes: z.array(z.string()).optional().describe("Array of tax IDs applied when selling (obtain via list_taxes)"),
+        purchase_taxes: z.array(z.string()).optional().describe("Array of tax IDs applied when purchasing (obtain via list_taxes)"),
+        unit_measure: z
+          .string()
+          .optional()
+          .describe("Unit of measurement symbol, e.g. 'hour', 'item', 'kg' (obtain custom symbols from list_units)"),
       },
     },
-    async ({ id, ...fields }) => {
-      const result = await client.mergePut(`/products/${id}/`, fields);
+    async ({ id, sale_value, purchase_value, ...fields }) => {
+      const body: Record<string, unknown> = { ...fields, sale_value, purchase_value };
+      if (sale_value !== undefined) body.sales = true;
+      if (purchase_value !== undefined) body.purchases = true;
+      const result = await client.mergePut(`/products/${id}/`, body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
