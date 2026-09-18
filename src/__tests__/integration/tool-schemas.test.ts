@@ -88,15 +88,14 @@ describe("tool-list schema generation for create_* tools", () => {
     }
   );
 
-  it("create_expense schema requires date, documenttype, and items", async () => {
+  it("create_expense schema requires date and items", async () => {
     const client = await connectedClient(elorusClient);
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === "create_expense")!;
 
-    expect(tool.inputSchema.required).toEqual(
-      expect.arrayContaining(["date", "documenttype", "items"])
-    );
+    expect(tool.inputSchema.required).toEqual(expect.arrayContaining(["date", "items"]));
     expect(tool.inputSchema.properties).toHaveProperty("items");
+    expect(tool.inputSchema.properties).not.toHaveProperty("documenttype");
   });
 
   it("create_recurring_invoice schema requires client, items, and end_datetime (the API rejects a blank/null end_datetime despite its docs implying otherwise)", async () => {
@@ -150,7 +149,6 @@ describe("create_expense request shape (through the real tool-call path)", () =>
       name: "create_expense",
       arguments: {
         date: "2026-07-15",
-        documenttype: "doctype-1",
         supplier: "3572475991324362252",
         currency_code: "GBP",
         calculator_mode: "initial",
@@ -185,7 +183,6 @@ describe("create_expense request shape (through the real tool-call path)", () =>
       name: "create_expense",
       arguments: {
         date: "2026-07-15",
-        documenttype: "doctype-1",
         items: [{ expense_category: "cat-1", amount: "100.00", taxes: ["tax-1"] }],
       },
     });
@@ -211,7 +208,6 @@ describe("create_expense request shape (through the real tool-call path)", () =>
       name: "create_expense",
       arguments: {
         date: "2026-07-15",
-        documenttype: "doctype-1",
         items: [{ expense_category: "cat-1", description: "no amount" }],
       },
     });
@@ -338,6 +334,8 @@ describe("add_bill_attachment", () => {
 
     const tmpFile = path.join(os.tmpdir(), `elorus-mcp-test-${Date.now()}.pdf`);
     fs.writeFileSync(tmpFile, "fake bill pdf bytes");
+    const previousRoot = process.env.ELORUS_ATTACHMENT_ROOT;
+    process.env.ELORUS_ATTACHMENT_ROOT = os.tmpdir();
     try {
       const result = await client.callTool({
         name: "add_bill_attachment",
@@ -352,6 +350,7 @@ describe("add_bill_attachment", () => {
       expect(await file.text()).toBe("fake bill pdf bytes");
     } finally {
       fs.unlinkSync(tmpFile);
+      process.env.ELORUS_ATTACHMENT_ROOT = previousRoot;
     }
   });
 

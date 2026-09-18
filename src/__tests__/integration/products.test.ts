@@ -66,20 +66,54 @@ describe("product tools", () => {
     expect(url).toBe(`https://api.elorus.com/v1.2/products/${single.id}/`);
   });
 
-  it("create_product POSTs provided fields to /products/", async () => {
+  it("create_product POSTs provided fields to /products/, inferring sales:true from sale_value", async () => {
     const created = { ...productsFixture.results[0], id: "5000000002" };
     const mockFetch = mockFetchWith(created, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "create_product",
-      arguments: { title: "Consulting", sale_price: "150.00" },
+      arguments: { title: "Consulting", sale_value: "150.00" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/products/");
-    expect(JSON.parse(options.body as string)).toEqual({ title: "Consulting", sale_price: "150.00" });
+    expect(JSON.parse(options.body as string)).toEqual({
+      title: "Consulting",
+      sale_value: "150.00",
+      sales: true,
+    });
+  });
+
+  it("create_product POSTs unit_measure and sale_taxes/purchase_taxes as given", async () => {
+    const created = { ...productsFixture.results[0], id: "5000000003" };
+    const mockFetch = mockFetchWith(created, 201);
+    const client = await connectedClient(elorusClient);
+
+    await client.callTool({
+      name: "create_product",
+      arguments: {
+        title: "Consulting hours",
+        sale_value: "80.00",
+        purchase_value: "40.00",
+        sale_taxes: ["tax-1"],
+        purchase_taxes: ["tax-2"],
+        unit_measure: "hour",
+      },
+    });
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(options.body as string)).toEqual({
+      title: "Consulting hours",
+      sale_value: "80.00",
+      purchase_value: "40.00",
+      sale_taxes: ["tax-1"],
+      purchase_taxes: ["tax-2"],
+      unit_measure: "hour",
+      sales: true,
+      purchases: true,
+    });
   });
 
   it("update_product fetches the current record, merges fields, and PUTs", async () => {
@@ -98,20 +132,20 @@ describe("product tools", () => {
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ ...current, sale_price: "900.00" }),
+        json: () => Promise.resolve({ ...current, sale_value: "900.00" }),
       });
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_product",
-      arguments: { id: current.id, sale_price: "900.00" },
+      arguments: { id: current.id, sale_value: "900.00" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
     expect(putOptions.method).toBe("PUT");
-    expect(JSON.parse(putOptions.body as string)).toMatchObject({ sale_price: "900.00" });
+    expect(JSON.parse(putOptions.body as string)).toMatchObject({ sale_value: "900.00", sales: true });
   });
 });

@@ -97,6 +97,24 @@ describe("contact tools (handler-level)", () => {
     expect(JSON.parse(options.body as string)).toMatchObject({ company: "Acme Corp", is_client: true });
   });
 
+  it("create_contact wraps email/phone into the API's array-of-objects shape", async () => {
+    const mockFetch = mockFetchWith({ id: "new-1", company: "Acme Corp" }, 201);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "create_contact",
+      arguments: { company: "Acme Corp", email: "billing@acme.com", phone: "555-0100" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(options.body as string)).toMatchObject({
+      company: "Acme Corp",
+      email: [{ email: "billing@acme.com", primary: true }],
+      phones: [{ number: "555-0100", primary: true }],
+    });
+  });
+
   it("update_contact fetches the current record, merges fields, and PUTs", async () => {
     const current = contactsFixture.results[0];
     const mockFetch = vi
@@ -128,5 +146,39 @@ describe("contact tools (handler-level)", () => {
     const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
     expect(putOptions.method).toBe("PUT");
     expect(JSON.parse(putOptions.body as string)).toMatchObject({ active: false });
+  });
+
+  it("update_contact wraps email/phone into the API's array-of-objects shape", async () => {
+    const current = contactsFixture.results[0];
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_contact",
+      arguments: { id: current.id, email: "new@acme.com", phone: "555-0199" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(JSON.parse(putOptions.body as string)).toMatchObject({
+      email: [{ email: "new@acme.com", primary: true }],
+      phones: [{ number: "555-0199", primary: true }],
+    });
   });
 });

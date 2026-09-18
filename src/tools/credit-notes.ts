@@ -79,12 +79,15 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
           .string()
           .optional()
           .describe("Exchange rate to organization base currency, e.g. '1.000000'"),
-        notes: z.string().optional().describe("Internal or external notes"),
+        notes: z
+          .string()
+          .optional()
+          .describe("Notes displayed on the credit note's printable form (maps to the API's public_notes field)"),
       },
     },
-    async (args) => {
-      const mode = args.calculator_mode ?? "initial";
-      args.items.forEach((item, i) => {
+    async ({ notes, ...rest }) => {
+      const mode = rest.calculator_mode ?? "initial";
+      rest.items.forEach((item, i) => {
         if (mode === "initial" && !item.unit_value) {
           throw new Error(
             `items[${i}]: calculator_mode 'initial' requires unit_value on each line item`
@@ -96,7 +99,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
           );
         }
       });
-      const result = await client.post("/creditnotes/", args);
+      const result = await client.post("/creditnotes/", { ...rest, public_notes: notes });
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -116,8 +119,8 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
           .describe("Amount to apply as a string, e.g. '150.00' (cannot exceed credit note balance)"),
       },
     },
-    async ({ id, ...body }) => {
-      const result = await client.post(`/creditnotes/${id}/apply/`, body);
+    async ({ id, invoice, amount }) => {
+      const result = await client.post(`/creditnotes/${id}/applied-credit/`, [{ invoice, amount }]);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

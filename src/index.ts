@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getConfig } from "./auth.js";
@@ -17,12 +18,16 @@ import { registerBillTools } from "./tools/bills.js";
 import { registerNoteTools } from "./tools/notes.js";
 import { registerResources } from "./resources/index.js";
 
+const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as {
+  version: string;
+};
+
 const config = getConfig();
 const client = new ElorusClient(config.apiKey, config.orgId, config.demo);
 
 const server = new McpServer({
   name: "elorus-mcp",
-  version: "0.2.0",
+  version: pkg.version,
 });
 
 // Tools

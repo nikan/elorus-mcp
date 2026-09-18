@@ -37,6 +37,33 @@ function mockFetchWith(body: unknown, status = 200) {
   return mockFetch;
 }
 
+function mockFetchSequence(responses: unknown[]) {
+  const mockFetch = vi.fn();
+  for (const body of responses) {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers(),
+      json: () => Promise.resolve(body),
+    });
+  }
+  vi.stubGlobal("fetch", mockFetch);
+  return mockFetch;
+}
+
+function mockFetchPdf(bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46])) {
+  const mockFetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    headers: new Headers({ "content-type": "application/pdf", "content-length": String(bytes.length) }),
+    arrayBuffer: () => Promise.resolve(bytes.buffer),
+  });
+  vi.stubGlobal("fetch", mockFetch);
+  return mockFetch;
+}
+
 describe("invoice tools (handler-level)", () => {
   const elorusClient = new ElorusClient("fixture-key", "fixture-org");
 
@@ -91,7 +118,51 @@ describe("invoice tools (handler-level)", () => {
     expect(JSON.parse(options.body as string)).toMatchObject({ client: "client-1" });
   });
 
-  it("void_invoice POSTs to the void sub-resource", async () => {
+  it("create_invoice converts due_date to due_days and notes to public_notes", async () => {
+    const mockFetch = mockFetchWith({ id: "inv-3" }, 201);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "create_invoice",
+      arguments: {
+        client: "client-1",
+        date: "2026-07-01",
+        documenttype: "doctype-1",
+        due_date: "2026-07-15",
+        notes: "Thanks for your business",
+        items: [{ title: "Consulting", quantity: "5", unit_value: "100.00" }],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(options.body as string);
+    expect(body.due_days).toBe(14);
+    expect(body.public_notes).toBe("Thanks for your business");
+    expect(body.due_date).toBeUndefined();
+    expect(body.notes).toBeUndefined();
+  });
+
+  it("create_invoice rejects a due_date before the invoice date without reaching the API", async () => {
+    const mockFetch = mockFetchWith({});
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "create_invoice",
+      arguments: {
+        client: "client-1",
+        date: "2026-07-15",
+        documenttype: "doctype-1",
+        due_date: "2026-07-01",
+        items: [{ title: "Consulting", quantity: "1", unit_value: "100.00" }],
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("void_invoice PUTs {void: true} to the void sub-resource", async () => {
     const mockFetch = mockFetchWith({ id: "inv-1", status: "void" });
     const client = await connectedClient(elorusClient);
 
@@ -100,42 +171,58 @@ describe("invoice tools (handler-level)", () => {
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/void/");
-    expect(options.method).toBe("POST");
+    expect(options.method).toBe("PUT");
+    expect(JSON.parse(options.body as string)).toEqual({ void: true });
   });
 
-  it("send_invoice_email POSTs recipients/subject/message/cc to the sendmail sub-resource", async () => {
-    const mockFetch = mockFetchWith({ sent: true });
+  it("send_invoice_email GETs defaults then POSTs merged to/cc/bcc/subject/message/attach_pdf", async () => {
+    const mockFetch = mockFetchSequence([
+      {
+        to: "default@example.com",
+        cc: "accounting@example.com, sales@example.com",
+        bcc: "",
+        subject: "Default subject",
+        message: "Default message",
+      },
+      { sent: true },
+    ]);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "send_invoice_email",
-      arguments: {
-        id: "inv-1",
-        to: ["client@example.com"],
-        subject: "Your invoice",
-        cc: ["accounting@example.com"],
-      },
+      arguments: { id: "inv-1", subject: "Your invoice" },
     });
 
     expect(result.isError).toBeFalsy();
-    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/sendmail/");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [getUrl] = mockFetch.mock.calls[0] as [string];
+    expect(getUrl).toBe("https://api.elorus.com/v1.2/invoices/inv-1/email/");
+    const [postUrl, options] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(postUrl).toBe("https://api.elorus.com/v1.2/invoices/inv-1/email/");
     expect(JSON.parse(options.body as string)).toEqual({
-      to: ["client@example.com"],
+      to: "default@example.com",
       subject: "Your invoice",
-      cc: ["accounting@example.com"],
+      message: "Default message",
+      cc: ["accounting@example.com", "sales@example.com"],
+      bcc: [],
+      attach_pdf: true,
     });
   });
 
-  it("export_invoice_pdf GETs the pdf sub-resource", async () => {
-    const mockFetch = mockFetchWith({ url: "https://files.elorus.com/invoice.pdf" });
+  it("export_invoice_pdf GETs the pdf sub-resource and returns a base64 resource blob", async () => {
+    const mockFetch = mockFetchPdf();
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({ name: "export_invoice_pdf", arguments: { id: "inv-1" } });
 
     expect(result.isError).toBeFalsy();
-    const [url] = mockFetch.mock.calls[0] as [string];
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/pdf/");
+    expect((options.headers as Record<string, string>).Accept).toBe("application/pdf");
+    const content = result.content as Array<{ type: string; resource: { mimeType: string; blob: string } }>;
+    expect(content[0].type).toBe("resource");
+    expect(content[0].resource.mimeType).toBe("application/pdf");
+    expect(Buffer.from(content[0].resource.blob, "base64").toString("utf-8")).toBe("%PDF");
   });
 
   it("create_invoice rejects a line item missing unit_value under calculator_mode 'initial' without reaching the API", async () => {
