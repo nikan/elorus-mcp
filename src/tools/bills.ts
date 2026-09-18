@@ -1,8 +1,8 @@
-import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { readAttachmentFile } from "../attachments.js";
+import { addAttachment } from "./attachments.js";
+import { splitEmailList } from "../email.js";
 import { billLineItemSchema } from "../schemas/bill-line-item.js";
 
 export function registerBillTools(server: McpServer, client: ElorusClient): void {
@@ -178,6 +178,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
     "add_bill_attachment",
     {
       description:
+        "Deprecated: use add_attachment with resource_type: \"bill\" instead. " +
         "Attach a file (e.g. a scanned receipt or supplier bill PDF) to an existing bill. " +
         "Provide EITHER file_path (read directly off this machine's local disk, restricted to the " +
         "directory tree configured via the ELORUS_ATTACHMENT_ROOT environment variable) OR " +
@@ -220,29 +221,9 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
       },
     },
     async ({ id, file_path, filename, content_base64, title, primary }) => {
-      let buffer: Buffer;
-      let resolvedFilename: string;
-      if (file_path) {
-        buffer = await readAttachmentFile(file_path);
-        resolvedFilename = filename ?? path.basename(file_path);
-      } else if (content_base64) {
-        if (!filename) {
-          throw new Error("filename is required when providing content_base64");
-        }
-        buffer = Buffer.from(content_base64, "base64");
-        resolvedFilename = filename;
-      } else {
-        throw new Error("Provide either file_path or content_base64");
-      }
-      const form = new FormData();
-      if (title) form.append("title", title);
-      form.append("file", new Blob([Uint8Array.from(buffer)]), resolvedFilename);
-      const result = await client.postMultipart<{ id: string }>(`/bills/${id}/attachments/`, form);
-      if (primary) {
-        await client.patch(`/bills/${id}/attachments/${result.id}/`, { primary: true });
-      }
+      const result = await addAttachment(client, "bill", id, { file_path, filename, content_base64, title, primary });
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ ...result, primary }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
     }
   );
@@ -259,6 +240,112 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
       const result = await client.put(`/bills/${id}/void/`, { void: true });
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "delete_bill",
+    {
+      description:
+        "Permanently delete a supplier bill. Unlike void_bill, this removes the record entirely — prefer " +
+        "void_bill for issued bills with financial history; this is intended for draft cleanup. This is " +
+        "a hard delete with no undo.",
+      inputSchema: {
+        id: z.string().describe("The Elorus bill ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/bills/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "send_bill_email",
+    {
+      description:
+        "Email a self-billed bill (an invoice the organization issues to itself) to its recipient. First " +
+        "fetches the organization's default recipient/subject/message for this bill, then overrides them " +
+        "with any fields you provide before sending.",
+      inputSchema: {
+        id: z.string().describe("The Elorus bill ID to send"),
+        to: z
+          .string()
+          .email()
+          .optional()
+          .describe("Recipient email address (default: the supplier's stored email)"),
+        subject: z
+          .string()
+          .optional()
+          .describe("Email subject line (default: the organization's email template)"),
+        message: z
+          .string()
+          .optional()
+          .describe("Email body text, may contain HTML (default: the organization's email template)"),
+        cc: z
+          .array(z.string().email())
+          .optional()
+          .describe("CC email addresses (default: the organization's configured CC list)"),
+        bcc: z
+          .array(z.string().email())
+          .optional()
+          .describe("BCC email addresses (default: the organization's configured BCC list)"),
+        attach_pdf: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Whether to attach the bill PDF to the email (default: true)"),
+      },
+    },
+    async ({ id, to, subject, message, cc, bcc, attach_pdf }) => {
+      const defaults = await client.get<{
+        to?: string;
+        cc?: string;
+        bcc?: string;
+        subject?: string;
+        message?: string;
+      }>(`/bills/${id}/email/`);
+      const body = {
+        to: to ?? defaults.to,
+        subject: subject ?? defaults.subject,
+        message: message ?? defaults.message,
+        cc: cc ?? splitEmailList(defaults.cc),
+        bcc: bcc ?? splitEmailList(defaults.bcc),
+        attach_pdf,
+      };
+      const result = await client.post(`/bills/${id}/email/`, body);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "export_bill_pdf",
+    {
+      description:
+        "Export a bill as a PDF. Applies to self-billed invoices (bills the organization issues to " +
+        "itself). Returns the PDF file content directly (base64-encoded).",
+      inputSchema: {
+        id: z.string().describe("The Elorus bill ID to export"),
+      },
+    },
+    async ({ id }) => {
+      const { data, contentType } = await client.getBinary(`/bills/${id}/pdf/`);
+      return {
+        content: [
+          {
+            type: "resource" as const,
+            resource: {
+              uri: `elorus://bills/${id}/pdf`,
+              mimeType: contentType,
+              blob: data.toString("base64"),
+            },
+          },
+        ],
       };
     }
   );

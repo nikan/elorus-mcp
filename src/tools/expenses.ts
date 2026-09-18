@@ -1,8 +1,7 @@
-import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { readAttachmentFile } from "../attachments.js";
+import { addAttachment } from "./attachments.js";
 import { expenseLineItemSchema } from "../schemas/expense-line-item.js";
 
 export function registerExpenseTools(server: McpServer, client: ElorusClient): void {
@@ -181,6 +180,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     "add_expense_attachment",
     {
       description:
+        "Deprecated: use add_attachment with resource_type: \"expense\" instead. " +
         "Attach a file (e.g. a scanned receipt or supplier invoice PDF) to an existing expense. " +
         "Provide EITHER file_path (read directly off this machine's local disk, restricted to the " +
         "directory tree configured via the ELORUS_ATTACHMENT_ROOT environment variable) OR " +
@@ -223,29 +223,15 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
       },
     },
     async ({ id, file_path, filename, content_base64, title, primary }) => {
-      let buffer: Buffer;
-      let resolvedFilename: string;
-      if (file_path) {
-        buffer = await readAttachmentFile(file_path);
-        resolvedFilename = filename ?? path.basename(file_path);
-      } else if (content_base64) {
-        if (!filename) {
-          throw new Error("filename is required when providing content_base64");
-        }
-        buffer = Buffer.from(content_base64, "base64");
-        resolvedFilename = filename;
-      } else {
-        throw new Error("Provide either file_path or content_base64");
-      }
-      const form = new FormData();
-      if (title) form.append("title", title);
-      form.append("file", new Blob([Uint8Array.from(buffer)]), resolvedFilename);
-      const result = await client.postMultipart<{ id: string }>(`/expenses/${id}/attachments/`, form);
-      if (primary) {
-        await client.patch(`/expenses/${id}/attachments/${result.id}/`, { primary: true });
-      }
+      const result = await addAttachment(client, "expense", id, {
+        file_path,
+        filename,
+        content_base64,
+        title,
+        primary,
+      });
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ ...result, primary }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
     }
   );

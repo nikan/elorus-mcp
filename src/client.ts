@@ -158,11 +158,20 @@ export class ElorusClient {
   }
 
   /**
-   * For endpoints (e.g. PDF exports) that return a binary body instead of JSON.
-   * `handleResponse` always calls `response.json()`, so this bypasses it entirely.
+   * For endpoints (e.g. PDF exports, attachment downloads) that return a binary body instead
+   * of JSON. `handleResponse` always calls `response.json()`, so this bypasses it entirely.
+   *
+   * `expectedContentType` is a substring to require in the response's Content-Type (also sent
+   * as the Accept header, prefixed with "application/"), defaulting to "pdf" to match every
+   * existing caller. Pass `null` for endpoints whose content type isn't known ahead of time
+   * (e.g. attachment downloads, which can be images/docs/etc.) — this sends a wildcard Accept
+   * header and skips the Content-Type check, trusting whatever the server returns.
    */
-  async getBinary(path: string): Promise<BinaryResponse> {
-    const headers = { ...this.headers, Accept: "application/pdf" };
+  async getBinary(path: string, expectedContentType: string | null = "pdf"): Promise<BinaryResponse> {
+    const headers = {
+      ...this.headers,
+      Accept: expectedContentType ? `application/${expectedContentType}` : "*/*",
+    };
     const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, { headers }, path);
     if (!response.ok) {
       let details = response.statusText;
@@ -175,9 +184,9 @@ export class ElorusClient {
       throw new Error(formatHttpError(response.status, details));
     }
     const contentType = response.headers.get("content-type") ?? "application/octet-stream";
-    if (!contentType.includes("pdf")) {
+    if (expectedContentType && !contentType.includes(expectedContentType)) {
       throw new Error(
-        `Elorus API error: expected a PDF response from ${path} but got Content-Type "${contentType}"`
+        `Elorus API error: expected a ${expectedContentType} response from ${path} but got Content-Type "${contentType}"`
       );
     }
     const contentLength = Number(response.headers.get("content-length") ?? "0");

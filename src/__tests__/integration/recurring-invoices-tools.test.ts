@@ -197,4 +197,26 @@ describe("recurring invoice tools (handler-level)", () => {
     expect(result.isError).toBe(true);
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it("delete_recurring_invoice DELETEs /recurringinvoices/{id}/", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "delete_recurring_invoice",
+      arguments: { id: "4000000001" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/recurringinvoices/4000000001/");
+    expect(options.method).toBe("DELETE");
+  });
 });
