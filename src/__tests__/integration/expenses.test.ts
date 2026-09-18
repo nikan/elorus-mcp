@@ -116,7 +116,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     expect(JSON.parse(putOptions.body as string)).toMatchObject({ reference: "REIMB-1" });
   });
 
-  it("update_expense with expense_category re-fetches the record and applies the category to every item", async () => {
+  it("update_expense with expense_category applies the category to every item from a single fetched snapshot", async () => {
     const current = {
       id: "exp-1",
       date: "2026-07-01",
@@ -140,13 +140,6 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
         statusText: "OK",
         headers: new Headers(),
         json: () => Promise.resolve(current),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        statusText: "OK",
-        headers: new Headers(),
-        json: () => Promise.resolve(current),
       });
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
@@ -157,8 +150,10 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    expect(mockFetch).toHaveBeenCalledTimes(3);
-    const [, putOptions] = mockFetch.mock.calls[2] as [string, RequestInit];
+    // Exactly one GET (inside mergePut) + one PUT — no separate pre-fetch that could race
+    // with a concurrent edit landing between two reads of the same expense.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
     expect(putOptions.method).toBe("PUT");
     const body = JSON.parse(putOptions.body as string);
     expect(body.items).toEqual([

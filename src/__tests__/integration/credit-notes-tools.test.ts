@@ -123,6 +123,6 @@ describe("credit note tools (list/apply)", () => {
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/applied-credit/");
-    expect(JSON.parse(options.body as string)).toEqual({ invoice: "inv-1", amount: "150.00" });
+    expect(JSON.parse(options.body as string)).toEqual([{ invoice: "inv-1", amount: "150.00" }]);
   });
 });

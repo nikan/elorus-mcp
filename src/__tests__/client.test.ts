@@ -211,6 +211,51 @@ describe("ElorusClient", () => {
       const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
       expect(JSON.parse(putOptions.body as string)).toEqual({ company: "Updated" });
     });
+
+    it("accepts a function form of fields, derived from a single fetched snapshot (no extra GET)", async () => {
+      const current = {
+        id: "exp-1",
+        date: "2026-07-01",
+        items: [
+          { id: "item-1", expense_category: "old-cat", amount: "10.00" },
+          { id: "item-2", expense_category: "old-cat", amount: "20.00" },
+        ],
+      };
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve(current),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve(current),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await client.mergePut("/expenses/exp-1/", (fetched) => ({
+        items: (fetched.items as Array<Record<string, unknown>>).map((item) => ({
+          ...item,
+          expense_category: "new-cat",
+        })),
+      }));
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(putOptions.body as string)).toEqual({
+        date: "2026-07-01",
+        items: [
+          { id: "item-1", expense_category: "new-cat", amount: "10.00" },
+          { id: "item-2", expense_category: "new-cat", amount: "20.00" },
+        ],
+      });
+    });
   });
 
   describe("postMultipart()", () => {

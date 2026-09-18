@@ -120,7 +120,9 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
       },
     },
     async ({ id, bill, amount }) => {
-      const result = await client.post(`/suppliercredits/${id}/applied-credit/`, { purchase: bill, amount });
+      const result = await client.post(`/suppliercredits/${id}/applied-credit/`, [
+        { purchase: bill, amount },
+      ]);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

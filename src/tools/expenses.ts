@@ -142,14 +142,15 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
       },
     },
     async ({ id, expense_category, ...fields }) => {
-      let overrides: Record<string, unknown> = fields;
-      if (expense_category !== undefined) {
-        const current = await client.get<{ items?: Array<Record<string, unknown>> }>(`/expenses/${id}/`);
-        overrides = {
-          ...fields,
-          items: (current.items ?? []).map((item) => ({ ...item, expense_category })),
-        };
-      }
+      const overrides =
+        expense_category === undefined
+          ? fields
+          : (current: Record<string, unknown>) => ({
+              ...fields,
+              items: (Array.isArray(current.items) ? current.items : []).map(
+                (item: Record<string, unknown>) => ({ ...item, expense_category })
+              ),
+            });
       const result = await client.mergePut(`/expenses/${id}/`, overrides);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],

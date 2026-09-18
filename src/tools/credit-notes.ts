@@ -119,8 +119,8 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
           .describe("Amount to apply as a string, e.g. '150.00' (cannot exceed credit note balance)"),
       },
     },
-    async ({ id, ...body }) => {
-      const result = await client.post(`/creditnotes/${id}/applied-credit/`, body);
+    async ({ id, invoice, amount }) => {
+      const result = await client.post(`/creditnotes/${id}/applied-credit/`, [{ invoice, amount }]);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

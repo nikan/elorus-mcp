@@ -224,15 +224,26 @@ export class ElorusClient {
    * writing back read-only noise risks the API rejecting the request outright on
    * some resources, and always risks masking a concurrent server-side change to
    * one of those computed values between the GET and the PUT.
+   *
+   * `fields` may be a function of the fetched record instead of a plain object,
+   * for callers that need to derive their overrides from the current state (e.g.
+   * rewriting every line item's category). Deriving from the same snapshot this
+   * method already fetched — rather than the caller doing its own separate GET
+   * first — avoids a second round trip and the race window a second GET would
+   * open between the two reads.
    */
-  async mergePut<T>(path: string, fields: Record<string, unknown>): Promise<T> {
+  async mergePut<T>(
+    path: string,
+    fields: Record<string, unknown> | ((current: Record<string, unknown>) => Record<string, unknown>)
+  ): Promise<T> {
     const current = await this.get<Record<string, unknown>>(path);
     const writableCurrent = Object.fromEntries(
       Object.entries(current).filter(
         ([key, value]) => value !== null && !READ_ONLY_RESPONSE_FIELDS.has(key)
       )
     );
-    return this.put<T>(path, { ...writableCurrent, ...fields });
+    const resolvedFields = typeof fields === "function" ? fields(current) : fields;
+    return this.put<T>(path, { ...writableCurrent, ...resolvedFields });
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {

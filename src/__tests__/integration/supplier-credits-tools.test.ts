@@ -123,6 +123,6 @@ describe("supplier credit tools (list/apply)", () => {
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/applied-credit/");
-    expect(JSON.parse(options.body as string)).toEqual({ purchase: "bill-1", amount: "100.00" });
+    expect(JSON.parse(options.body as string)).toEqual([{ purchase: "bill-1", amount: "100.00" }]);
   });
 });
