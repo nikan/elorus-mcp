@@ -204,3 +204,7 @@ Read-only resources that return up to 100 of the most recent records as JSON, wi
 - Invoice/credit-note/supplier-credit line items use `title`/`quantity`/`unit_value` (or `unit_total`, depending on `calculator_mode`); bill line items also require `expense_category`; expense line items use a different shape: `expense_category`/`amount`/`description`
 - Elorus does not provide idempotency keys — query before creating to avoid duplicates
 - Pagination params: `page` (default 1) and `page_size` (default 20, max 100)
+
+## Development
+
+Architecture, conventions, and build/test commands for contributors (human or AI) are documented in [`AGENTS.md`](AGENTS.md) (also loaded by Claude Code via `CLAUDE.md`). Known gaps against the full Elorus API surface, and the plan to close them, are tracked in [`project/AUDIT.md`](project/AUDIT.md) and [`project/api-coverage-plan.md`](project/api-coverage-plan.md).
