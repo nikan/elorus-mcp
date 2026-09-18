@@ -181,4 +181,26 @@ describe("contact tools (handler-level)", () => {
       phones: [{ number: "555-0199", primary: true }],
     });
   });
+
+  it("delete_contact DELETEs /contacts/{id}/", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await client.callTool({
+      name: "delete_contact",
+      arguments: { id: "contact-1" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/contacts/contact-1/");
+    expect(options.method).toBe("DELETE");
+  });
 });

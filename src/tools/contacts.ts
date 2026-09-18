@@ -168,4 +168,24 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
       };
     }
   );
+
+  server.registerTool(
+    "delete_contact",
+    {
+      description:
+        "Permanently delete a contact. This is a hard delete with no undo — if the contact has " +
+        "existing invoices/bills/payments the API may reject it, or the contact should more likely " +
+        "be archived instead via update_contact with active: false. Confirm the ID is correct first " +
+        "(e.g. via get_contact).",
+      inputSchema: {
+        id: z.string().describe("The Elorus contact ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/contacts/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
+      };
+    }
+  );
 }
