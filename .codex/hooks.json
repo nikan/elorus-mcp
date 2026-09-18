@@ -1,0 +1,17 @@
+{
+  "description": "Check origin before each Codex task turn in this repository.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let p=require('path'),f=require('fs'),d=process.cwd();while(!f.existsSync(p.join(d,'scripts','hooks','check-origin.cjs'))){let u=p.dirname(d);if(u===d)process.exit(1);d=u}require(p.join(d,'scripts','hooks','check-origin.cjs'))\"",
+            "timeout": 90,
+            "statusMessage": "Checking origin before work"
+          }
+        ]
+      }
+    ]
+  }
+}
