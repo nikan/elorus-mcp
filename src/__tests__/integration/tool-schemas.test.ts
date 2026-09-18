@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -311,5 +314,58 @@ describe("add_bill_attachment", () => {
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads from file_path when given, inferring the filename from its basename", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        statusText: "Created",
+        headers: new Headers(),
+        json: () => Promise.resolve({ id: "att-1", primary: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve({ id: "att-1", primary: true }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const tmpFile = path.join(os.tmpdir(), `elorus-mcp-test-${Date.now()}.pdf`);
+    fs.writeFileSync(tmpFile, "fake bill pdf bytes");
+    try {
+      const result = await client.callTool({
+        name: "add_bill_attachment",
+        arguments: { id: "bill-1", file_path: tmpFile },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const [, uploadOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const form = uploadOptions.body as FormData;
+      const file = form.get("file") as File;
+      expect(file.name).toBe(path.basename(tmpFile));
+      expect(await file.text()).toBe("fake bill pdf bytes");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("throws when neither file_path nor content_base64 is given", async () => {
+    const client = await connectedClient(elorusClient);
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await client.callTool({
+      name: "add_bill_attachment",
+      arguments: { id: "bill-1", filename: "bill.pdf" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
