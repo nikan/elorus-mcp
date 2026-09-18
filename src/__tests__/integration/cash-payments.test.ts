@@ -52,6 +52,17 @@ describe("cash payment tools", () => {
     expect(parsed.searchParams.get("purchase")).toBe("bill-1");
   });
 
+  it("get_cash_payment GETs /cashpayments/{id}/", async () => {
+    const mockFetch = mockFetchWith({ id: "cp-1", amount: "250.00" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "get_cash_payment", arguments: { id: "cp-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/cp-1/");
+  });
+
   it("record_cash_payment links to a bill via purchase_payments when bill is given", async () => {
     const mockFetch = mockFetchWith({ id: "cp-1" }, 201);
     const client = await connectedClient(elorusClient);
@@ -142,5 +153,26 @@ describe("cash payment tools", () => {
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/cp-1/");
     expect(options.method).toBe("DELETE");
+  });
+
+  it("export_cash_payment_pdf GETs the pdf sub-resource and returns a base64 resource blob", async () => {
+    const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers({ "content-type": "application/pdf", "content-length": String(bytes.length) }),
+      arrayBuffer: () => Promise.resolve(bytes.buffer),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "export_cash_payment_pdf", arguments: { id: "cp-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/cp-1/pdf/");
+    const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
+    expect(content[0].resource.mimeType).toBe("application/pdf");
   });
 });

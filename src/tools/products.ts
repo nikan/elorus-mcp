@@ -138,4 +138,22 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
       };
     }
   );
+
+  server.registerTool(
+    "delete_product",
+    {
+      description:
+        "Permanently delete a product or service from the catalog. This is a hard delete with no undo — " +
+        "if the product is referenced by existing invoices/bills the API may reject it.",
+      inputSchema: {
+        id: z.string().describe("The Elorus product ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/products/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
+      };
+    }
+  );
 }

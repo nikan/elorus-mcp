@@ -28,6 +28,22 @@ export function registerConfigTools(server: McpServer, client: ElorusClient): vo
   );
 
   server.registerTool(
+    "get_tax",
+    {
+      description: "Fetch a single tax rate by its Elorus ID.",
+      inputSchema: {
+        id: z.string().describe("The Elorus tax ID"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.get(`/taxes/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
     "list_document_types",
     {
       description:
@@ -45,6 +61,22 @@ export function registerConfigTools(server: McpServer, client: ElorusClient): vo
     },
     async ({ page, page_size }) => {
       const result = await client.get("/documenttypes/", { page, page_size });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "get_document_type",
+    {
+      description: "Fetch a single document type by its Elorus ID.",
+      inputSchema: {
+        id: z.string().describe("The Elorus document type ID"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.get(`/documenttypes/${id}/`);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
@@ -93,6 +125,22 @@ export function registerConfigTools(server: McpServer, client: ElorusClient): vo
     },
     async ({ page, page_size }) => {
       const result = await client.get("/expensecategories/", { page, page_size });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "get_expense_category",
+    {
+      description: "Fetch a single expense category by its Elorus ID.",
+      inputSchema: {
+        id: z.string().describe("The Elorus expense category ID"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.get(`/expensecategories/${id}/`);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

@@ -16,6 +16,9 @@ import { registerSupplierCreditTools } from "./tools/supplier-credits.js";
 import { registerExpenseTools } from "./tools/expenses.js";
 import { registerBillTools } from "./tools/bills.js";
 import { registerNoteTools } from "./tools/notes.js";
+import { registerAttachmentTools } from "./tools/attachments.js";
+import { registerSentEmailTools } from "./tools/sent-emails.js";
+import { registerAppliedCreditTools } from "./tools/applied-credit.js";
 import { registerResources } from "./resources/index.js";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as {
@@ -43,6 +46,9 @@ registerSupplierCreditTools(server, client);
 registerExpenseTools(server, client);
 registerBillTools(server, client);
 registerNoteTools(server, client);
+registerAttachmentTools(server, client);
+registerSentEmailTools(server, client);
+registerAppliedCreditTools(server, client);
 
 // Resources
 registerResources(server, client);

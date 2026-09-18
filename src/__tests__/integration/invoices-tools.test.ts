@@ -242,4 +242,103 @@ describe("invoice tools (handler-level)", () => {
     expect(result.isError).toBe(true);
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it("update_invoice PATCHes directly when only PATCH-safe fields are given", async () => {
+    const mockFetch = mockFetchWith({ id: "inv-1", custom_id: "PO-9" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", custom_id: "PO-9", draft: false },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/");
+    expect(options.method).toBe("PATCH");
+    expect(JSON.parse(options.body as string)).toEqual({ custom_id: "PO-9", draft: false });
+  });
+
+  it("update_invoice uses GET-then-PUT for date when the invoice is a draft", async () => {
+    const current = { id: "inv-1", draft: true, date: "2026-07-01", client: "client-1" };
+    const mockFetch = mockFetchSequence([current, { ...current, date: "2026-07-05" }]);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", date: "2026-07-05" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    expect(JSON.parse(putOptions.body as string)).toMatchObject({ date: "2026-07-05" });
+  });
+
+  it("update_invoice converts due_date to due_days and notes to public_notes on the draft-only path", async () => {
+    const current = { id: "inv-1", draft: true, date: "2026-07-01" };
+    const mockFetch = mockFetchSequence([current, { ...current }]);
+    const client = await connectedClient(elorusClient);
+
+    await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", due_date: "2026-07-15", notes: "Updated notes" },
+    });
+
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.due_days).toBe(14);
+    expect(body.public_notes).toBe("Updated notes");
+    expect(body.due_date).toBeUndefined();
+    expect(body.notes).toBeUndefined();
+  });
+
+  it("update_invoice rejects a draft-only field (e.g. date) when the invoice is not a draft, without PUTting", async () => {
+    const current = { id: "inv-1", draft: false, date: "2026-07-01" };
+    const mockFetch = mockFetchSequence([current]);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", date: "2026-07-05" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0][1]?.method).toBeUndefined();
+  });
+
+  it("update_invoice rejects an items line missing unit_value under calculator_mode 'initial' without reaching the API", async () => {
+    const mockFetch = mockFetchWith({});
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_invoice",
+      arguments: { id: "inv-1", items: [{ title: "Consulting", quantity: "1" }] },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("delete_invoice DELETEs /invoices/{id}/", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "delete_invoice", arguments: { id: "inv-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/");
+    expect(options.method).toBe("DELETE");
+  });
 });

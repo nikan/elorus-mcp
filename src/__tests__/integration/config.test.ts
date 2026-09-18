@@ -50,6 +50,17 @@ describe("config lookup tools", () => {
     expect(url).toBe("https://api.elorus.com/v1.2/taxes/?page=1");
   });
 
+  it("get_tax GETs /taxes/{id}/", async () => {
+    const mockFetch = mockFetchWith({ id: "tax-1", title: "VAT 24%", rate: "24.00" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "get_tax", arguments: { id: "tax-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/taxes/tax-1/");
+  });
+
   it("list_document_types GETs /documenttypes/", async () => {
     const mockFetch = mockFetchWith({ count: 1, results: [{ id: "doctype-1", title: "Invoice" }] });
     const client = await connectedClient(elorusClient);
@@ -59,6 +70,17 @@ describe("config lookup tools", () => {
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toBe("https://api.elorus.com/v1.2/documenttypes/");
+  });
+
+  it("get_document_type GETs /documenttypes/{id}/", async () => {
+    const mockFetch = mockFetchWith({ id: "doctype-1", title: "Invoice" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "get_document_type", arguments: { id: "doctype-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/documenttypes/doctype-1/");
   });
 
   it("list_units GETs /units/", async () => {
@@ -81,5 +103,16 @@ describe("config lookup tools", () => {
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toBe("https://api.elorus.com/v1.2/expensecategories/");
+  });
+
+  it("get_expense_category GETs /expensecategories/{id}/", async () => {
+    const mockFetch = mockFetchWith({ id: "cat-1", title: "Software" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "get_expense_category", arguments: { id: "cat-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/expensecategories/cat-1/");
   });
 });

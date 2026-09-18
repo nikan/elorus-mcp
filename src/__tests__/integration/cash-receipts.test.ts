@@ -65,6 +65,17 @@ describe("cash receipt tools", () => {
     expect(parsed.searchParams.get("invoice")).toBe("inv-1");
   });
 
+  it("get_cash_receipt GETs /cashreceipts/{id}/", async () => {
+    const mockFetch = mockFetchWith({ id: "cr-1", amount: "500.00" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "get_cash_receipt", arguments: { id: "cr-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/cr-1/");
+  });
+
   it("record_cash_receipt maps client/invoice to contact/invoice_payments and POSTs to /cashreceipts/", async () => {
     const mockFetch = mockFetchWith({ id: "cr-1" }, 201);
     const client = await connectedClient(elorusClient);
@@ -118,5 +129,56 @@ describe("cash receipt tools", () => {
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].type).toBe("resource");
     expect(content[0].resource.mimeType).toBe("application/pdf");
+  });
+
+  it("update_cash_receipt fetches the current record, merges fields, and PUTs", async () => {
+    const current = { id: "cr-1", date: "2026-07-01", amount: "500.00", title: "" };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve({ ...current, amount: "600.00" }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_cash_receipt",
+      arguments: { id: "cr-1", amount: "600.00" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    expect(JSON.parse(putOptions.body as string)).toMatchObject({ amount: "600.00" });
+  });
+
+  it("delete_cash_receipt DELETEs /cashreceipts/{id}/", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "delete_cash_receipt", arguments: { id: "cr-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/cr-1/");
+    expect(options.method).toBe("DELETE");
   });
 });

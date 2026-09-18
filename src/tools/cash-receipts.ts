@@ -50,6 +50,22 @@ export function registerCashReceiptTools(server: McpServer, client: ElorusClient
   );
 
   server.registerTool(
+    "get_cash_receipt",
+    {
+      description: "Fetch a single payment received from a client by its Elorus ID.",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash receipt ID"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.get(`/cashreceipts/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
     "record_cash_receipt",
     {
       description:
@@ -90,6 +106,52 @@ export function registerCashReceiptTools(server: McpServer, client: ElorusClient
       });
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "update_cash_receipt",
+    {
+      description:
+        "Update fields on an existing cash receipt (e.g. its title, date, or amount). Only provided " +
+        "fields are changed; the Elorus API only supports PUT on cash receipts, so this fetches the " +
+        "current record and merges your fields into it before saving.",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash receipt ID to update"),
+        date: z.string().optional().describe("Payment date in YYYY-MM-DD format"),
+        amount: z.string().optional().describe("Amount received as a string, e.g. '500.00'"),
+        title: z
+          .string()
+          .optional()
+          .describe(
+            "Short label/reason for this payment. Cash receipts have no separate notes field, " +
+              "so this is the only free-text field available."
+          ),
+      },
+    },
+    async ({ id, ...fields }) => {
+      const result = await client.mergePut(`/cashreceipts/${id}/`, fields);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "delete_cash_receipt",
+    {
+      description:
+        "Permanently delete a payment received from a client. If the payment is linked to an invoice, " +
+        "the invoice's paid amount is reduced accordingly. This is a hard delete with no undo.",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash receipt ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/cashreceipts/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
       };
     }
   );

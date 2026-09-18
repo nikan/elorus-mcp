@@ -148,4 +148,23 @@ describe("product tools", () => {
     expect(putOptions.method).toBe("PUT");
     expect(JSON.parse(putOptions.body as string)).toMatchObject({ sale_value: "900.00", sales: true });
   });
+
+  it("delete_product DELETEs /products/{id}/", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.reject(new Error("no body")),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "delete_product", arguments: { id: "prod-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/products/prod-1/");
+    expect(options.method).toBe("DELETE");
+  });
 });

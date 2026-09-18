@@ -307,4 +307,22 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
       };
     }
   );
+
+  server.registerTool(
+    "delete_recurring_invoice",
+    {
+      description:
+        "Permanently delete a recurring invoice schedule. This only removes the template — invoices " +
+        "it has already generated are unaffected. This is a hard delete with no undo.",
+      inputSchema: {
+        id: z.string().describe("The Elorus recurring invoice ID to delete"),
+      },
+    },
+    async ({ id }) => {
+      await client.delete(`/recurringinvoices/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
+      };
+    }
+  );
 }

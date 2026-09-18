@@ -125,4 +125,190 @@ describe("supplier credit tools (list/apply)", () => {
     expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/applied-credit/");
     expect(JSON.parse(options.body as string)).toEqual([{ purchase: "bill-1", amount: "100.00" }]);
   });
+
+  it("get_supplier_credit fetches a single supplier credit by id", async () => {
+    const mockFetch = mockFetchWith({ id: "sc-1" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "get_supplier_credit", arguments: { id: "sc-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/");
+  });
+
+  it("update_supplier_credit PATCHes directly when only PATCH-safe fields are given", async () => {
+    const mockFetch = mockFetchWith({ id: "sc-1", draft: false });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_supplier_credit",
+      arguments: { id: "sc-1", draft: false },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/");
+    expect(options.method).toBe("PATCH");
+    expect(JSON.parse(options.body as string)).toEqual({ draft: false });
+  });
+
+  it("update_supplier_credit uses GET-then-PUT for reference when the supplier credit is a draft", async () => {
+    const current = { id: "sc-1", draft: true, date: "2026-07-01", reference: "" };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve({ ...current, reference: "PO-123" }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_supplier_credit",
+      arguments: { id: "sc-1", reference: "PO-123" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    expect(JSON.parse(putOptions.body as string)).toMatchObject({ reference: "PO-123" });
+  });
+
+  it("update_supplier_credit rejects a draft-only field (e.g. reference) when not a draft, without PUTting", async () => {
+    const current = { id: "sc-1", draft: false, date: "2026-07-01" };
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers(),
+      json: () => Promise.resolve(current),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_supplier_credit",
+      arguments: { id: "sc-1", reference: "PO-123" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("delete_supplier_credit DELETEs /suppliercredits/{id}/", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: new Headers(),
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "delete_supplier_credit", arguments: { id: "sc-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/");
+    expect(options.method).toBe("DELETE");
+  });
+
+  it("void_supplier_credit PUTs {void: true} to the void sub-resource", async () => {
+    const mockFetch = mockFetchWith({ id: "sc-1", status: "void" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({ name: "void_supplier_credit", arguments: { id: "sc-1" } });
+
+    expect(result.isError).toBeFalsy();
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/void/");
+    expect(options.method).toBe("PUT");
+    expect(JSON.parse(options.body as string)).toEqual({ void: true });
+  });
+
+  it("send_supplier_credit_email GETs defaults then POSTs merged fields", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            to: "supplier@example.com",
+            cc: "",
+            bcc: "",
+            subject: "Default subject",
+            message: "Default message",
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve({ sent: true }),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "send_supplier_credit_email",
+      arguments: { id: "sc-1" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [getUrl] = mockFetch.mock.calls[0] as [string];
+    expect(getUrl).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/email/");
+    const [postUrl, options] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(postUrl).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/email/");
+    expect(JSON.parse(options.body as string)).toEqual({
+      to: "supplier@example.com",
+      subject: "Default subject",
+      message: "Default message",
+      cc: [],
+      bcc: [],
+      attach_pdf: true,
+    });
+  });
+
+  it("export_supplier_credit_pdf GETs the pdf sub-resource and returns a base64 resource blob", async () => {
+    const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers({ "content-type": "application/pdf", "content-length": String(bytes.length) }),
+      arrayBuffer: () => Promise.resolve(bytes.buffer),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "export_supplier_credit_pdf",
+      arguments: { id: "sc-1" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/pdf/");
+    const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
+    expect(content[0].resource.mimeType).toBe("application/pdf");
+  });
 });

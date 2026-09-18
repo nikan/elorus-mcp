@@ -141,8 +141,10 @@ and `project`. That gets corrected in Phase 1.
 
 ## Phase 1 — Close gaps on existing resources + generalized sub-resource tools
 
+**Status: Done.**
+
 New tools on already-wrapped resources (files in parentheses):
-`delete_contact` (`contacts.ts`), `delete_product` (`products.ts`),
+`delete_contact` (`contacts.ts`, was already present), `delete_product` (`products.ts`),
 `update_invoice`, `delete_invoice` (`invoices.ts`),
 `get_credit_note`, `update_credit_note`, `delete_credit_note`, `void_credit_note`,
 `send_credit_note_email`, `export_credit_note_pdf` (`credit-notes.ts`),
@@ -155,17 +157,83 @@ New tools on already-wrapped resources (files in parentheses):
 `delete_recurring_invoice` (`recurring-invoices.ts`),
 `get_tax`, `get_document_type`, `get_expense_category` (`config.ts`).
 
-`update_invoice`, `update_credit_note`, and `update_supplier_credit` must follow
-the PATCH-vs-draft-only-PUT caveat under "Update pattern" above rather than a
-plain `mergePut` — do not let item edits silently drop or delete lines.
+**`update_credit_note`/`update_supplier_credit` — resolved via live sandbox
+testing** (`.env.dev`, `ELORUS_DEMO=1`, not production). `developer.elorus.com`
+is a JS SPA WebFetch can't render, and `OPTIONS` on this API returns only
+`{name, renders, parses}` — no field-level schema — so metadata introspection
+was a dead end. Instead, created disposable draft credit notes/supplier
+credits in the sandbox and PATCHed individual fields one at a time, comparing
+the record before/after each call via a separate GET (the PATCH response body
+itself is misleading — it always echoes the same reduced field set regardless
+of what was sent or whether it took effect). Findings, confirmed on both
+resource types:
+- `custom_id`: PATCH-safe, confirmed to actually persist.
+- `draft`: PATCH-safe, confirmed to actually persist (issues the document,
+  assigns a document number).
+- `date`, `client`/`supplier`, `public_notes`, `reference` (supplier credits):
+  PATCH returns `200` but **silently has no effect** — the API does not
+  reject the field, it just ignores it. This is worse than a clean 400 and is
+  exactly the kind of guessed-allowlist risk this item was flagged to avoid.
+- `exchange_rate`: PATCH returns `200` but had no effect in this org's test
+  (currency_code matched the organization's base currency, GBP) — inconclusive
+  whether that's a PATCH restriction or just currency business logic; not
+  claimed as PATCH-safe either way.
+- `trackingcategories`: a shape guess (`[{category, value}]`) produced a
+  server-side `500` (Django error page, not a clean validation error) rather
+  than confirming or rejecting support — not pursued further, not exposed.
+- The draft-only full-PUT path (mirroring `mergePut`: GET, strip read-only
+  fields, merge overrides, PUT) was verified to work for `date` on both
+  resource types while draft.
+- `delete_credit_note`/`delete_supplier_credit` were confirmed to correctly
+  reject deletion of issued (non-draft) documents
+  (`"This document is marked as issued and therefore cannot be deleted."`),
+  and `void_credit_note`/`void_supplier_credit` were confirmed to work, while
+  cleaning up the test records.
+
+Given this, `update_credit_note`/`update_supplier_credit` expose only
+`custom_id`/`draft` as PATCH-safe; every other field (date,
+client/supplier, documenttype, items, currency_code, exchange_rate, notes,
+reference) routes through the draft-only full-PUT path, same as
+`update_invoice`. `payment_gateways`/`trackingcategories` are deliberately
+**not** exposed on either tool — unlike invoices, their support wasn't
+confirmed and the one shape tried triggered a `500`.
+
+**Separate bug found during this verification, not yet fixed:**
+`create_supplier_credit`'s items use `lineItemSchema` (the invoice-style
+`title`/`unit_value` shape), but a real supplier credit's items use
+`description` (not `title`) and require `expense_category` — confirmed via a
+live `400` (`{"items":[{"expense_category":["This field is required."]}]}`)
+when using the current schema, and via a successful create once
+`description`/`expense_category` were added. This is the same shape
+`create_bill` already remaps to correctly (`billLineItemSchema`, with
+`title`→`description` remapping) — `create_supplier_credit` needs the
+equivalent fix. As shipped, `create_supplier_credit` will be rejected by the
+real API.
+
+`update_invoice` follows the PATCH-vs-draft-only-PUT caveat under "Update
+pattern" above rather than a plain `mergePut` — do not let item edits silently
+drop or delete lines.
 `export_bill_pdf` follows the same `getBinary` pattern as `export_invoice_pdf`;
 per the Elorus reference, the endpoint applies to self-billed invoices (bills
 the organization issues to itself), so the tool description should say so.
 
-Plus the cross-cutting work above (extend `notes.ts`, add `attachments.ts` and
-`sent-emails.ts`, applied-credit list/unapply, `client.ts` `getBinary` generalization).
+Plus the cross-cutting work above (extend `notes.ts`, add `attachments.ts`,
+`sent-emails.ts`, and `applied-credit.ts` (list/unapply), `client.ts` `getBinary`
+generalization). `add_bill_attachment`/`add_expense_attachment` are now thin
+deprecated wrappers over the shared `addAttachment()` helper in `attachments.ts`.
+The `splitEmailList` helper used by every `send_*_email` tool was extracted to
+`src/email.ts` so `bills.ts`/`credit-notes.ts`/`supplier-credits.ts` don't each
+carry their own copy.
 
-Register the 2 new modules in `src/index.ts`. Update README's tool tables for every
+`download_attachment`'s path (`/{type}s/{id}/attachments/{attachmentId}/file/`)
+is confirmed against the Elorus sandbox (`.env.dev`, `ELORUS_DEMO=1`): uploaded
+a test attachment to a contact, its create response's `file_url` field is
+exactly this path, `GET` on it returns a `307` to an Azure Blob Storage SAS
+URL, and Node's `fetch` (used by `client.getBinary`) follows it transparently
+and returns the real file bytes with the correct `Content-Type`. Test
+attachment was deleted afterward.
+
+Register the 3 new modules in `src/index.ts`. Update README's tool tables for every
 touched resource (also fixes pre-existing README staleness, e.g. `delete_expense`
 already exists in code but is undocumented).
 

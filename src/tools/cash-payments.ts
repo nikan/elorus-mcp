@@ -50,6 +50,22 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
   );
 
   server.registerTool(
+    "get_cash_payment",
+    {
+      description: "Fetch a single payment made to a supplier by its Elorus ID.",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash payment ID"),
+      },
+    },
+    async ({ id }) => {
+      const result = await client.get(`/cashpayments/${id}/`);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
     "record_cash_payment",
     {
       description:
@@ -135,6 +151,31 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
       await client.delete(`/cashpayments/${id}/`);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ id, deleted: true }, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "export_cash_payment_pdf",
+    {
+      description: "Export a cash payment as a PDF. Returns the PDF file content directly (base64-encoded).",
+      inputSchema: {
+        id: z.string().describe("The Elorus cash payment ID to export"),
+      },
+    },
+    async ({ id }) => {
+      const { data, contentType } = await client.getBinary(`/cashpayments/${id}/pdf/`);
+      return {
+        content: [
+          {
+            type: "resource" as const,
+            resource: {
+              uri: `elorus://cashpayments/${id}/pdf`,
+              mimeType: contentType,
+              blob: data.toString("base64"),
+            },
+          },
+        ],
       };
     }
   );
