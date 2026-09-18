@@ -1,0 +1,21 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "5000000001",
+      "title": "Website Design",
+      "description": "Custom website design package",
+      "code": "WEB-001",
+      "sale_price": "800.00",
+      "purchase_price": null,
+      "taxes": ["tax-1"],
+      "unit": "unit-1",
+      "notes": "",
+      "organization": "3406315494884508916",
+      "created": "2026-01-01T00:00:00Z",
+      "modified": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

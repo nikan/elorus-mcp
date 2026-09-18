@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
@@ -176,12 +178,32 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description:
         "Attach a file (e.g. a scanned receipt or supplier invoice PDF) to an existing expense. " +
-        "Provide the file content as base64. By default the attachment is set as the primary " +
-        "receipt (the document shown in the expense's receipt panel).",
+        "Provide EITHER file_path (read directly off this machine's local disk — e.g. a PDF a " +
+        "Collect run already saved into the accounting folder) OR content_base64 (raw bytes " +
+        "supplied by the caller). Prefer file_path whenever the file already exists on disk: it " +
+        "avoids pushing a large base64 string through the calling client. By default the " +
+        "attachment is set as the primary receipt (the document shown in the expense's receipt panel).",
       inputSchema: {
         id: z.string().describe("The Elorus expense ID to attach the file to"),
-        filename: z.string().describe("File name including extension, e.g. 'receipt.pdf'"),
-        content_base64: z.string().describe("Base64-encoded file content"),
+        file_path: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to a file already on this machine's local disk, e.g. " +
+              "'C:\\\\Users\\\\nanag\\\\OneDrive\\\\Professional\\\\PLS\\\\Accounting\\\\FY2026-27\\\\invoice.pdf'. " +
+              "Read directly from disk — use this instead of content_base64 whenever the file already exists locally."
+          ),
+        filename: z
+          .string()
+          .optional()
+          .describe(
+            "File name including extension, e.g. 'receipt.pdf'. Required when using content_base64; " +
+              "inferred from file_path's basename when omitted."
+          ),
+        content_base64: z
+          .string()
+          .optional()
+          .describe("Base64-encoded file content. Omit this and use file_path when the file already exists on disk."),
         title: z
           .string()
           .optional()
@@ -195,10 +217,24 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           ),
       },
     },
-    async ({ id, filename, content_base64, title, primary }) => {
+    async ({ id, file_path, filename, content_base64, title, primary }) => {
+      let buffer: Buffer;
+      let resolvedFilename: string;
+      if (file_path) {
+        buffer = fs.readFileSync(file_path);
+        resolvedFilename = filename ?? path.basename(file_path);
+      } else if (content_base64) {
+        if (!filename) {
+          throw new Error("filename is required when providing content_base64");
+        }
+        buffer = Buffer.from(content_base64, "base64");
+        resolvedFilename = filename;
+      } else {
+        throw new Error("Provide either file_path or content_base64");
+      }
       const form = new FormData();
       if (title) form.append("title", title);
-      form.append("file", new Blob([Buffer.from(content_base64, "base64")]), filename);
+      form.append("file", new Blob([Uint8Array.from(buffer)]), resolvedFilename);
       const result = await client.postMultipart<{ id: string }>(`/expenses/${id}/attachments/`, form);
       if (primary) {
         await client.patch(`/expenses/${id}/attachments/${result.id}/`, { primary: true });
