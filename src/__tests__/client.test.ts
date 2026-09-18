@@ -141,7 +141,6 @@ describe("ElorusClient", () => {
       expect(putUrl).toBe("https://api.elorus.com/v1.2/contacts/abc/");
       expect(putOptions.method).toBe("PUT");
       expect(JSON.parse(putOptions.body as string)).toEqual({
-        id: "abc",
         company: "Acme",
         vat_number: "456",
         is_client: true,
@@ -172,9 +171,45 @@ describe("ElorusClient", () => {
 
       const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
       expect(JSON.parse(putOptions.body as string)).toEqual({
-        id: "abc",
         company: "Updated",
       });
+    });
+
+    it("strips server-computed read-only fields from the fetched record before merging", async () => {
+      const current = {
+        id: "abc",
+        organization: "org-1",
+        created: "2026-01-01T00:00:00Z",
+        modified: "2026-01-02T00:00:00Z",
+        representation: "Contact #abc",
+        status: "paid",
+        permalink: "//example.com/abc",
+        net: "80.00",
+        total: "100.00",
+        company: "Acme",
+      };
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve(current),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve({ ...current, company: "Updated" }),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await client.mergePut("/contacts/abc/", { company: "Updated" });
+
+      const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(putOptions.body as string)).toEqual({ company: "Updated" });
     });
   });
 
@@ -256,6 +291,7 @@ describe("ElorusClient", () => {
     });
 
     it("falls back to statusText when response body is not JSON", async () => {
+      vi.useFakeTimers();
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
@@ -264,9 +300,82 @@ describe("ElorusClient", () => {
         json: () => Promise.reject(new Error("not json")),
       }));
 
-      await expect(client.get("/contacts/")).rejects.toThrow(
+      const promise = client.get("/contacts/");
+      const assertion = expect(promise).rejects.toThrow(
         "Elorus API error: HTTP 500: Internal Server Error"
       );
+      await vi.runAllTimersAsync();
+      await assertion;
+      vi.useRealTimers();
+    });
+  });
+
+  describe("retry behavior for GET", () => {
+    it("retries a 500 GET up to the retry limit, then surfaces the error", async () => {
+      vi.useFakeTimers();
+      const mockFetch = makeFetch(500, { detail: "boom" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const promise = client.get("/contacts/");
+      const assertion = expect(promise).rejects.toThrow("Elorus API error: HTTP 500: boom");
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      vi.useRealTimers();
+    });
+
+    it("retries a 429 GET and succeeds once a retry returns 200", async () => {
+      vi.useFakeTimers();
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: new Headers({ "retry-after": "1" }),
+          json: () => Promise.resolve({ detail: "throttled" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: new Headers(),
+          json: () => Promise.resolve({ count: 0, results: [] }),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const promise = client.get("/contacts/");
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result).toEqual({ count: 0, results: [] });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
+
+    it("does not retry non-retryable statuses like 400", async () => {
+      const mockFetch = makeFetch(400, { detail: "bad" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await expect(client.get("/contacts/")).rejects.toThrow();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("never retries writes (POST) on 500", async () => {
+      const mockFetch = makeFetch(500, { detail: "boom" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await expect(client.post("/invoices/", {})).rejects.toThrow();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("request timeout", () => {
+    it("surfaces a clear error when the request aborts due to timeout", async () => {
+      const timeoutError = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeoutError));
+
+      await expect(client.get("/contacts/")).rejects.toThrow(/timed out after 30000ms/);
     });
   });
 });

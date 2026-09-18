@@ -10,10 +10,64 @@ export type QueryParams = Record<string, string | number | boolean | undefined>;
 /** Bounds the base64-encoded blob returned to an MCP client over stdio. */
 const MAX_BINARY_RESPONSE_BYTES = 10 * 1024 * 1024;
 
+/** Every request gets this deadline so a stalled connection can't hang a tool call indefinitely. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Bounded backoff for idempotent reads only — writes/payments are never auto-retried. */
+const MAX_GET_RETRIES = 2;
+const MAX_RETRY_DELAY_MS = 10_000;
+
 export interface BinaryResponse {
   data: Buffer;
   contentType: string;
 }
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function retryDelayMs(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (!Number.isNaN(seconds)) {
+      return Math.max(0, Math.min(seconds * 1000, MAX_RETRY_DELAY_MS));
+    }
+    const dateMs = Date.parse(retryAfter);
+    if (!Number.isNaN(dateMs)) {
+      return Math.max(0, Math.min(dateMs - Date.now(), MAX_RETRY_DELAY_MS));
+    }
+  }
+  return Math.min(500 * 2 ** attempt, MAX_RETRY_DELAY_MS);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Field names that appear across Elorus GET responses but are always server-computed —
+ * writing them back on a PUT is never correct. Not resource-specific: applied generically
+ * by mergePut, since each field is either universally read-only (id, organization, created,
+ * modified) or read-only wherever it does appear (representation, status, totals, permalink).
+ */
+const READ_ONLY_RESPONSE_FIELDS = new Set([
+  "id",
+  "organization",
+  "created",
+  "modified",
+  "representation",
+  "display_name",
+  "status",
+  "permalink",
+  "initial",
+  "net",
+  "total",
+  "payable",
+  "paid",
+  "last_execution",
+  "next_execution",
+]);
 
 export class ElorusClient {
   private readonly baseUrl = "https://api.elorus.com/v1.2";
@@ -31,6 +85,18 @@ export class ElorusClient {
     }
   }
 
+  /** Wraps fetch with the request deadline and a clear timeout error message. */
+  private async fetchWithTimeout(url: string, init: RequestInit, path: string): Promise<Response> {
+    try {
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    } catch (err) {
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw new Error(`Elorus API error: request to ${path} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw err;
+    }
+  }
+
   async get<T>(path: string, params?: QueryParams): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
     if (params) {
@@ -40,16 +106,20 @@ export class ElorusClient {
         }
       }
     }
-    const response = await fetch(url.toString(), { headers: this.headers });
+    let response = await this.fetchWithTimeout(url.toString(), { headers: this.headers }, path);
+    for (let attempt = 0; isRetryableStatus(response.status) && attempt < MAX_GET_RETRIES; attempt++) {
+      await sleep(retryDelayMs(response, attempt));
+      response = await this.fetchWithTimeout(url.toString(), { headers: this.headers }, path);
+    }
     return this.handleResponse<T>(response);
   }
 
   async post<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
+    const response = await this.fetchWithTimeout(
+      `${this.baseUrl}${path}`,
+      { method: "POST", headers: this.headers, body: JSON.stringify(body) },
+      path
+    );
     return this.handleResponse<T>(response);
   }
 
@@ -61,29 +131,29 @@ export class ElorusClient {
   async postMultipart<T>(path: string, form: FormData): Promise<T> {
     const headers = { ...this.headers };
     delete headers["Content-Type"];
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "POST",
-      headers,
-      body: form,
-    });
+    const response = await this.fetchWithTimeout(
+      `${this.baseUrl}${path}`,
+      { method: "POST", headers, body: form },
+      path
+    );
     return this.handleResponse<T>(response);
   }
 
   async patch<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "PATCH",
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
+    const response = await this.fetchWithTimeout(
+      `${this.baseUrl}${path}`,
+      { method: "PATCH", headers: this.headers, body: JSON.stringify(body) },
+      path
+    );
     return this.handleResponse<T>(response);
   }
 
   async put<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "PUT",
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
+    const response = await this.fetchWithTimeout(
+      `${this.baseUrl}${path}`,
+      { method: "PUT", headers: this.headers, body: JSON.stringify(body) },
+      path
+    );
     return this.handleResponse<T>(response);
   }
 
@@ -93,7 +163,7 @@ export class ElorusClient {
    */
   async getBinary(path: string): Promise<BinaryResponse> {
     const headers = { ...this.headers, Accept: "application/pdf" };
-    const response = await fetch(`${this.baseUrl}${path}`, { headers });
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, { headers }, path);
     if (!response.ok) {
       let details = response.statusText;
       try {
@@ -128,10 +198,11 @@ export class ElorusClient {
   }
 
   async delete<T>(path: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "DELETE",
-      headers: this.headers,
-    });
+    const response = await this.fetchWithTimeout(
+      `${this.baseUrl}${path}`,
+      { method: "DELETE", headers: this.headers },
+      path
+    );
     return this.handleResponse<T>(response);
   }
 
@@ -146,13 +217,22 @@ export class ElorusClient {
    * be null") — they must be omitted instead. So null-valued fields from the
    * fetched record are dropped before merging; explicit nulls the caller passes
    * in `fields` are preserved.
+   *
+   * GET responses also include server-computed fields (id, organization, created,
+   * modified, computed totals, permalinks, status, ...) that are never legal to
+   * write back. These are stripped so the PUT only resends real input fields —
+   * writing back read-only noise risks the API rejecting the request outright on
+   * some resources, and always risks masking a concurrent server-side change to
+   * one of those computed values between the GET and the PUT.
    */
   async mergePut<T>(path: string, fields: Record<string, unknown>): Promise<T> {
     const current = await this.get<Record<string, unknown>>(path);
-    const currentWithoutNulls = Object.fromEntries(
-      Object.entries(current).filter(([, value]) => value !== null)
+    const writableCurrent = Object.fromEntries(
+      Object.entries(current).filter(
+        ([key, value]) => value !== null && !READ_ONLY_RESPONSE_FIELDS.has(key)
+      )
     );
-    return this.put<T>(path, { ...currentWithoutNulls, ...fields });
+    return this.put<T>(path, { ...writableCurrent, ...fields });
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
