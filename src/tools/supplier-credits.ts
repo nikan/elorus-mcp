@@ -1,8 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
-import { lineItemSchema } from "../schemas/line-item.js";
-import { billLineItemUpdateSchema } from "../schemas/bill-line-item.js";
+import { billLineItemSchema, billLineItemUpdateSchema } from "../schemas/bill-line-item.js";
 import { splitEmailList } from "../email.js";
 
 export function registerSupplierCreditTools(server: McpServer, client: ElorusClient): void {
@@ -229,7 +228,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
     "create_supplier_credit",
     {
       description:
-        "Record a credit note received from a supplier (e.g. a refund or price correction on a bill). Use list_taxes and list_document_types to obtain valid IDs.",
+        "Record a credit note received from a supplier (e.g. a refund or price correction on a bill). Use list_taxes, list_expense_categories, and list_document_types to obtain valid IDs.",
       inputSchema: {
         supplier: z.string().describe("Contact ID of the supplier"),
         date: z.string().describe("Supplier credit date in YYYY-MM-DD format"),
@@ -237,9 +236,13 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
           .string()
           .describe("Document type ID (obtain from list_document_types)"),
         items: z
-          .array(lineItemSchema)
+          .array(billLineItemSchema)
           .min(1)
-          .describe("Line items on this supplier credit (at least one required)"),
+          .describe(
+            "Line items on this supplier credit (at least one required), using the same shape as bills — " +
+              "title (sent to the API as description), quantity, unit_value/unit_total, a required " +
+              "expense_category, taxes, discount, product"
+          ),
         calculator_mode: z
           .enum(["initial", "total"])
           .optional()
@@ -276,7 +279,12 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
           );
         }
       });
-      const result = await client.post("/suppliercredits/", { ...rest, public_notes: notes });
+      const body = {
+        ...rest,
+        items: rest.items.map(({ title, ...item }) => ({ ...item, description: title })),
+        public_notes: notes,
+      };
+      const result = await client.post("/suppliercredits/", body);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

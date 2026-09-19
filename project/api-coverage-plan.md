@@ -198,17 +198,14 @@ reference) routes through the draft-only full-PUT path, same as
 **not** exposed on either tool — unlike invoices, their support wasn't
 confirmed and the one shape tried triggered a `500`.
 
-**Separate bug found during this verification, not yet fixed:**
-`create_supplier_credit`'s items use `lineItemSchema` (the invoice-style
+**Separate bug found during this verification, fixed:**
+`create_supplier_credit`'s items used `lineItemSchema` (the invoice-style
 `title`/`unit_value` shape), but a real supplier credit's items use
 `description` (not `title`) and require `expense_category` — confirmed via a
 live `400` (`{"items":[{"expense_category":["This field is required."]}]}`)
-when using the current schema, and via a successful create once
-`description`/`expense_category` were added. This is the same shape
-`create_bill` already remaps to correctly (`billLineItemSchema`, with
-`title`→`description` remapping) — `create_supplier_credit` needs the
-equivalent fix. As shipped, `create_supplier_credit` will be rejected by the
-real API.
+when using the old schema, and via a successful create once
+`description`/`expense_category` were added. Fixed by switching to the same
+`billLineItemSchema` + `title`→`description` remap `create_bill` uses.
 
 **PR review follow-up, resolved:** a review of the Phase 1 PR flagged three bugs
 in `update_invoice`/`update_credit_note`/`update_supplier_credit`, all fixed:
@@ -219,10 +216,9 @@ in `update_invoice`/`update_credit_note`/`update_supplier_credit`, all fixed:
    variants of the create schemas with an optional `id` field.
 2. `update_supplier_credit`'s `items` used the invoice-style `lineItemSchema`
    shape instead of the bill-style shape supplier credits actually need
-   (`description`, required `expense_category` — see the `create_supplier_credit`
-   known issue below). Fixed by switching to `billLineItemUpdateSchema` plus the
-   same `title`→`description` remap `create_bill` uses. `create_supplier_credit`
-   itself is unchanged and still has the known issue below.
+   (`description`, required `expense_category`). Fixed by switching to
+   `billLineItemUpdateSchema` plus the same `title`→`description` remap
+   `create_bill` uses. `create_supplier_credit` had the same bug — see above.
 3. `calculator_mode` was validated against `items` locally but never written to
    the PUT body, so changing it silently had no effect, and a `calculator_mode`-
    only call (no other draft-only field) fell through to the PATCH path and sent
