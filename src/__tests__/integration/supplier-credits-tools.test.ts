@@ -52,7 +52,7 @@ describe("supplier credit tools (list/apply)", () => {
     expect(parsed.searchParams.get("date_after")).toBe("2026-01-01");
   });
 
-  it("create_supplier_credit POSTs a valid supplier credit", async () => {
+  it("create_supplier_credit POSTs items with title remapped to description", async () => {
     const mockFetch = mockFetchWith({ id: "sc-1" }, 201);
     const client = await connectedClient(elorusClient);
 
@@ -62,14 +62,20 @@ describe("supplier credit tools (list/apply)", () => {
         supplier: "sup-1",
         date: "2026-07-01",
         documenttype: "doctype-1",
-        items: [{ title: "Refund", quantity: "1", unit_value: "50.00" }],
+        items: [
+          { title: "Refund", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+        ],
       },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/");
-    expect(JSON.parse(options.body as string)).toMatchObject({ supplier: "sup-1" });
+    const body = JSON.parse(options.body as string);
+    expect(body).toMatchObject({ supplier: "sup-1" });
+    expect(body.items).toEqual([
+      { description: "Refund", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+    ]);
   });
 
   it("create_supplier_credit maps notes to public_notes", async () => {
@@ -83,7 +89,9 @@ describe("supplier credit tools (list/apply)", () => {
         date: "2026-07-01",
         documenttype: "doctype-1",
         notes: "Price correction",
-        items: [{ title: "Refund", quantity: "1", unit_value: "50.00" }],
+        items: [
+          { title: "Refund", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+        ],
       },
     });
 
@@ -103,7 +111,7 @@ describe("supplier credit tools (list/apply)", () => {
         supplier: "sup-1",
         date: "2026-07-01",
         documenttype: "doctype-1",
-        items: [{ title: "Refund", quantity: "1" }],
+        items: [{ title: "Refund", quantity: "1", expense_category: "cat-1" }],
       },
     });
 

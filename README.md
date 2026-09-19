@@ -146,15 +146,13 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 |---|---|
 | `list_supplier_credits` | Filter supplier credits by supplier or date range |
 | `get_supplier_credit` | Fetch a supplier credit by ID |
-| `create_supplier_credit` | Record a credit note received from a supplier |
-| `update_supplier_credit` | Update fields on an existing supplier credit. `custom_id`/`draft` are PATCH-safe at any status; every other field (date, supplier, items, calculator_mode, currency_code, exchange_rate, notes, reference) requires the supplier credit to still be a draft and is applied via a full PUT — updating `items` this way replaces the entire line list, so include each existing line's `id` to keep it; items use the bill-style shape (`expense_category` required, `title` sent to the API as `description`), not the invoice-style shape `create_supplier_credit` currently uses (see known issue below) |
+| `create_supplier_credit` | Record a credit note received from a supplier. Items use the bill-style shape (`expense_category` required, `title` sent to the API as `description`) |
+| `update_supplier_credit` | Update fields on an existing supplier credit. `custom_id`/`draft` are PATCH-safe at any status; every other field (date, supplier, items, calculator_mode, currency_code, exchange_rate, notes, reference) requires the supplier credit to still be a draft and is applied via a full PUT — updating `items` this way replaces the entire line list, so include each existing line's `id` to keep it; items use the bill-style shape (`expense_category` required, `title` sent to the API as `description`) |
 | `apply_supplier_credit` | Apply a supplier credit against an open bill |
 | `delete_supplier_credit` | Permanently delete a supplier credit (prefer `void_supplier_credit` for issued supplier credits with financial history) |
 | `void_supplier_credit` | Void a supplier credit |
 | `send_supplier_credit_email` | Email a supplier credit to the supplier |
 | `export_supplier_credit_pdf` | Export a supplier credit as a PDF (returns the file content directly, base64-encoded) |
-
-> **Known issue:** `create_supplier_credit`'s line items currently use the invoice-style `title`/`unit_value` shape, but live testing against a real organization shows the API actually requires `description` (not `title`) and a required `expense_category` per item — the same shape `create_bill` already handles correctly. As currently implemented, `create_supplier_credit` will be rejected by the real API with a 400 (`"expense_category": ["This field is required."]`). `update_supplier_credit` uses the correct bill-style shape; only `create_supplier_credit` still has this bug. Not yet fixed — tracked as a follow-up.
 
 ### Cash receipts (payments received from clients)
 | Tool | Description |
@@ -261,7 +259,7 @@ Read-only resources that return up to 100 of the most recent records as JSON, wi
 
 - All monetary values are strings (e.g. `"1500.00"`) to avoid floating-point precision issues
 - Use `list_taxes`, `list_document_types`, `list_units`, and `list_expense_categories` to look up valid IDs before creating invoices, bills, expenses, credit notes, or products (bills don't use a document type — only invoices, credit notes, and estimates do)
-- Invoice/credit-note line items use `title`/`quantity`/`unit_value` (or `unit_total`, depending on `calculator_mode`); bill line items also require `expense_category`; expense line items use a different shape: `expense_category`/`amount`/`description`. `update_supplier_credit`'s items use the bill-style shape too (`create_supplier_credit`'s items don't yet — see known issue above)
+- Invoice/credit-note line items use `title`/`quantity`/`unit_value` (or `unit_total`, depending on `calculator_mode`); bill and supplier-credit line items also require `expense_category`; expense line items use a different shape: `expense_category`/`amount`/`description`
 - Elorus does not provide idempotency keys — query before creating to avoid duplicates
 - Pagination params: `page` (default 1) and `page_size` (default 20, max 100)
 
