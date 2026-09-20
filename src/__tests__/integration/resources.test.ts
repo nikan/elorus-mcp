@@ -36,7 +36,7 @@ describe("MCP resources", () => {
     vi.unstubAllGlobals();
   });
 
-  it("lists all seven registered resources", async () => {
+  it("lists all ten registered resources", async () => {
     const client = await connectedClient(elorusClient);
     const { resources } = await client.listResources();
 
@@ -50,6 +50,9 @@ describe("MCP resources", () => {
         "elorus://expenses",
         "elorus://invoices",
         "elorus://products",
+        "elorus://estimates",
+        "elorus://deliverynotes",
+        "elorus://goodsreceipts",
       ].sort()
     );
   });
@@ -62,6 +65,9 @@ describe("MCP resources", () => {
     ["elorus://expenses", "/expenses/"],
     ["elorus://bills", "/bills/"],
     ["elorus://products", "/products/"],
+    ["elorus://estimates", "/estimates/"],
+    ["elorus://deliverynotes", "/deliverynotes/"],
+    ["elorus://goodsreceipts", "/goodsreceipts/"],
   ])("reading %s GETs %s with page_size=100", async (uri, path) => {
     const mockFetch = mockFetchWith({ count: 1, results: [{ id: "1" }] });
     const client = await connectedClient(elorusClient);

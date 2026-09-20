@@ -93,6 +93,72 @@ Note: if the server is launched by an MCP client config (e.g. Claude Desktop/Cod
 | `send_invoice_email` | Email an invoice to the client |
 | `export_invoice_pdf` | Export an invoice as a PDF (returns the file content directly, base64-encoded) |
 
+### Estimates
+
+| Tool | Description |
+|------|-------------|
+| `list_estimates` | List and filter |
+| `get_estimate` | Fetch one |
+| `create_estimate` | Create |
+| `update_estimate` | Update metadata or draft contents |
+| `delete_estimate` | Delete a draft |
+| `send_estimate_email` | Email with organization defaults and optional overrides |
+| `export_estimate_pdf` | Export an inline PDF |
+
+### Delivery notes
+
+| Tool | Description |
+|------|-------------|
+| `list_delivery_notes` | List and filter |
+| `get_delivery_note` | Fetch one |
+| `create_delivery_note` | Create |
+| `update_delivery_note` | Update metadata or draft contents |
+| `delete_delivery_note` | Delete a draft |
+| `void_delivery_note` | Void an issued document |
+| `send_delivery_note_email` | Email with organization defaults and optional overrides |
+| `export_delivery_note_pdf` | Export an inline PDF |
+
+### Goods receipts
+
+| Tool | Description |
+|------|-------------|
+| `list_goods_receipts` | List and filter |
+| `get_goods_receipt` | Fetch one |
+| `create_goods_receipt` | Create |
+| `update_goods_receipt` | Update metadata or draft contents |
+| `delete_goods_receipt` | Delete a draft |
+| `void_goods_receipt` | Void an issued document |
+| `send_goods_receipt_email` | Email with organization defaults and optional overrides |
+| `export_goods_receipt_pdf` | Export an inline PDF |
+
+These documents use nested tax objects (`taxes: [{"tax": "<tax-id>"}]`) and unit
+symbols such as `item` or `kg`. Delivery-note lines require `unit_measure`; goods
+receipts track quantities without prices. Delivery notes may require complete
+billing, shipping, and loading addresses depending on the organization and movement.
+
+Updates preserve omitted fields. `custom_id`, `draft`, and `template` use PATCH;
+estimates also support `accept_status` through PATCH. Other edits require an
+existing draft. An `items` update replaces the entire list: include every existing
+line's `id` to retain it. Date range filters use `period_from` and `period_to` together.
+The existing shared notes, attachments, discussions, and sent-email tools apply
+according to their documented resource-type lists.
+
+### Numbering sequences
+
+| Tool | Description |
+|------|-------------|
+| `list_goods_receipt_sequences` | List goods-receipt numbering sequences |
+| `create_goods_receipt_sequence` | Create a sequence by name |
+| `delete_goods_receipt_sequence` | Delete a sequence by name |
+| `rename_goods_receipt_sequence` | Rename using `old_name` and `new_name` |
+| `list_document_type_sequences` | List sequences for a `document_type_id` |
+| `create_document_type_sequence` | Create a document-type sequence by name |
+| `delete_document_type_sequence` | Delete a document-type sequence by name |
+| `rename_document_type_sequence` | Rename a document-type sequence |
+
+Sequence names contain 1–10 characters. Use the name as `sequence_flat` when
+creating documents. Sequence list filters accept `active: "1"` or `active: "0"`.
+
 ### Recurring invoices
 | Tool | Description |
 |---|---|
@@ -243,6 +309,9 @@ Read-only resources that return up to 100 of the most recent records as JSON, wi
 | `elorus://cashpayments` | All cash payments (payments made to suppliers) |
 | `elorus://expenses` | All expense records |
 | `elorus://bills` | All supplier bills |
+| `elorus://estimates` | Estimates |
+| `elorus://deliverynotes` | Delivery notes |
+| `elorus://goodsreceipts` | Goods receipts |
 | `elorus://products` | All products and services in the catalog |
 
 ## Example prompts

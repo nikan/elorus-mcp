@@ -86,4 +86,10 @@ export function registerResources(server: McpServer, client: ElorusClient): void
     },
     makeReader("/products/", client)
   );
+  for (const name of ["estimates", "deliverynotes", "goodsreceipts"]) {
+    server.registerResource(name, `elorus://${name}`, {
+      description: `Up to 100 ${name} records in the organization.`,
+      mimeType: "application/json",
+    }, makeReader(`/${name}/`, client));
+  }
 }

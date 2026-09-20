@@ -206,10 +206,10 @@ export class ElorusClient {
     return { data: Buffer.from(arrayBuffer), contentType };
   }
 
-  async delete<T>(path: string): Promise<T> {
+  async delete<T>(path: string, body?: unknown): Promise<T> {
     const response = await this.fetchWithTimeout(
       `${this.baseUrl}${path}`,
-      { method: "DELETE", headers: this.headers },
+      { method: "DELETE", headers: this.headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) },
       path
     );
     return this.handleResponse<T>(response);

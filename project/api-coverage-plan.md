@@ -272,6 +272,10 @@ already exists in code but is undocumented).
 
 ## Phase 2 — New sales/purchase document types
 
+**Status: Done (September 20, 2026).** Added 31 tools and three read-only MCP
+resources. See [Phase 2 verification](phase2-verification.md) for the verified
+request schemas, demo round trips, API inconsistencies resolved, and test coverage.
+
 - `src/tools/estimates.ts`: list/get/create/update/delete + `send_estimate_email` +
   `export_estimate_pdf` (no void — estimates aren't voided per the matrix). Reuses
   the Phase-1 generic notes/discussions/attachments/sent-emails tools automatically
@@ -341,11 +345,10 @@ with get-single where the API has `/{id}/`, and full CRUD where it doesn't:
 
 ## Open items to resolve during implementation (not blocking this plan)
 
-- Exact request bodies for the goods-receipt-sequence and document-type-sequence
-  `delete`/`rename` action endpoints (non-standard URL shape) — read directly from
-  the spec's `requestBody` for those two paths before coding.
+- **Resolved in Phase 2:** sequence DELETE sends `{ name }`; rename PUT sends
+  `{ old_name, new_name }`. Both action routes were verified in the demo.
 - Whether `download_attachment` needs explicit 307-redirect handling or `fetch`'s
   default `redirect: "follow"` already covers it — verify against a real attachment
   in a demo org.
-- Confirm estimates' create/update schema is close enough to invoices' to reuse
-  `lineItemSchema` verbatim vs. needing its own `estimate-line-item.ts`.
+- **Resolved in Phase 2:** estimates need their own writable item schema with
+  nested tax objects; the existing invoice schema is not reused.
