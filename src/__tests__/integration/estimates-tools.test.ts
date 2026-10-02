@@ -32,7 +32,7 @@ describe("estimate calculator_mode total_pre_discount", () => {
   });
 
   it("accepts the mode on create", async () => {
-    const item = { title: "Service", quantity: "1", unit_value: "10.00" };
+    const item = { title: "Service", quantity: "1", unit_value_gross: "12.40" };
     const result = await client.callTool({
       name: "create_estimate",
       arguments: { client: "123", calculator_mode: "total_pre_discount", items: [item] },
@@ -60,5 +60,40 @@ describe("estimate calculator_mode total_pre_discount", () => {
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
     expect(body.calculator_mode).toBe("total_pre_discount");
     expect(body.public_notes).toBe("Revised");
+  });
+  it("validates gross pricing for total_pre_discount instead of requiring unit_value", async () => {
+    const item = { title: "Service", quantity: "1", unit_value_gross: "12.40", unit_total: "12.40" };
+    const created = await client.callTool({
+      name: "create_estimate",
+      arguments: { client: "123", calculator_mode: "total_pre_discount", items: [item] },
+    });
+    expect(created.isError).toBeFalsy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const missing = await client.callTool({
+      name: "create_estimate",
+      arguments: { client: "123", calculator_mode: "total_pre_discount", items: [{ title: "S", unit_value: "10.00" }] },
+    });
+    expect(missing.isError).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("validates replacement items against the inherited total_pre_discount mode", async () => {
+    const current = { id: "100", client: "123", draft: true, calculator_mode: "total_pre_discount", items: [] };
+    fetchMock.mockResolvedValueOnce(response(current));
+    const ok = await client.callTool({
+      name: "update_estimate",
+      arguments: { id: "100", items: [{ id: "200", title: "S", unit_value_gross: "12.40", unit_total: "12.40" }] },
+    });
+    expect(ok.isError).toBeFalsy();
+    expect(fetchMock.mock.calls[1][1].method).toBe("PUT");
+
+    fetchMock.mockResolvedValueOnce(response(current));
+    const bad = await client.callTool({
+      name: "update_estimate",
+      arguments: { id: "100", items: [{ id: "200", title: "S", unit_value: "10.00" }] },
+    });
+    expect(bad.isError).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

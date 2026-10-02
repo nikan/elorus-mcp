@@ -127,8 +127,10 @@ function validatePrices(items: unknown, mode: unknown): void {
   items.forEach((item, index) => {
     // Goods receipts and unpriced delivery notes have no monetary values. Product-linked
     // estimates may inherit their price. Validate explicit pricing against the effective mode.
-    if (item.unit_value === undefined && item.unit_total === undefined) return;
-    const field = mode === "total" ? "unit_total" : "unit_value";
+    if (item.unit_value === undefined && item.unit_total === undefined && !(mode === "total_pre_discount" && item.unit_value_gross !== undefined)) return;
+    // total_pre_discount prices are entered gross (tax-inclusive, before discount), so the gross
+    // price is its required input rather than the tax-exclusive unit_value.
+    const field = mode === "total" ? "unit_total" : mode === "total_pre_discount" ? "unit_value_gross" : "unit_value";
     if (item[field] === undefined) throw new Error(`items[${index}]: calculator_mode '${mode}' requires ${field}`);
   });
 }
