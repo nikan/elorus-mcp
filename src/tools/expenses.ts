@@ -3,7 +3,7 @@ import { z } from "zod";
 import { ElorusClient } from "../client.js";
 import { elorusId } from "../schemas/id.js";
 import { addAttachment } from "./attachments.js";
-import { expenseLineItemSchema } from "../schemas/expense-line-item.js";
+import { expenseLineItemSchema, expenseLineItemUpdateSchema } from "../schemas/expense-line-item.js";
 
 export function registerExpenseTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -141,12 +141,12 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
           ),
         reference: z.string().optional().describe("Reference number or identifier for this expense"),
         items: z
-          .array(expenseLineItemSchema)
+          .array(expenseLineItemUpdateSchema)
           .min(1)
           .optional()
           .describe(
             "Replacement line items. The whole array is replaced, so send every line you want to keep — " +
-              "omitted lines are dropped. This is the only way to change an amount. Each item's amount is " +
+              "omitted lines are dropped. Include each existing line's `id` to edit it in place instead of recreating it. This is the only way to change an amount. Each item's amount is " +
               "pre-tax or post-tax according to the expense's existing calculator_mode. Mutually exclusive " +
               "with expense_category."
           ),

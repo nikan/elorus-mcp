@@ -210,6 +210,45 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     ]);
   });
 
+  it("update_expense with items preserves caller-supplied line IDs so unchanged lines are not recreated", async () => {
+    const current = {
+      id: "6001",
+      items: [
+        { id: "item-1", expense_category: "cat-1", amount: "16.21" },
+        { id: "item-2", expense_category: "cat-1", amount: "5.00" },
+      ],
+    };
+    const okResponse = {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers(),
+      json: () => Promise.resolve(current),
+    };
+    const mockFetch = vi.fn().mockResolvedValueOnce(okResponse).mockResolvedValueOnce(okResponse);
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_expense",
+      arguments: {
+        id: "6001",
+        items: [
+          { id: "item-1", expense_category: "cat-1", amount: "16.34" },
+          { id: "item-2", expense_category: "cat-1", amount: "5.00" },
+        ],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([
+      { id: "item-1", expense_category: "cat-1", amount: "16.34" },
+      { id: "item-2", expense_category: "cat-1", amount: "5.00" },
+    ]);
+  });
+
   it("update_expense maps item taxes into the {tax, auto_calculate} shape the API expects", async () => {
     const current = { id: "6001", items: [{ id: "item-1", expense_category: "cat-1", amount: "10.00" }] };
     const mockFetch = vi

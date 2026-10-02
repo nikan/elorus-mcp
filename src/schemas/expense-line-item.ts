@@ -19,3 +19,13 @@ export const expenseLineItemSchema = z.object({
 });
 
 export type ExpenseLineItem = z.infer<typeof expenseLineItemSchema>;
+
+export const expenseLineItemUpdateSchema = expenseLineItemSchema.extend({
+  id: z
+    .string()
+    .optional()
+    .describe(
+      "Existing line item ID (from get_expense). Include it to edit that line in place; lines sent " +
+        "without an id are created new, and existing lines left out of the array are deleted."
+    ),
+});
