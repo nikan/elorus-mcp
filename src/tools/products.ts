@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 export function registerProductTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -45,7 +46,7 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
     {
       description: "Fetch a single product or service by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus product ID"),
+        id: elorusId("The Elorus product ID"),
       },
     },
     async ({ id }) => {
@@ -114,7 +115,7 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
         "Update fields on an existing product or service. Only provided fields are changed (PATCH semantics); " +
         "the Elorus API only supports PUT on products, so this fetches the current record and merges your fields into it before saving.",
       inputSchema: {
-        id: z.string().describe("The Elorus product ID to update"),
+        id: elorusId("The Elorus product ID to update"),
         title: z.string().optional().describe("Product or service name"),
         description: z.string().optional().describe("Detailed description"),
         code: z.string().optional().describe("Product code or SKU"),
@@ -146,7 +147,7 @@ export function registerProductTools(server: McpServer, client: ElorusClient): v
         "Permanently delete a product or service from the catalog. This is a hard delete with no undo — " +
         "if the product is referenced by existing invoices/bills the API may reject it.",
       inputSchema: {
-        id: z.string().describe("The Elorus product ID to delete"),
+        id: elorusId("The Elorus product ID to delete"),
       },
     },
     async ({ id }) => {

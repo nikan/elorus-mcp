@@ -60,31 +60,31 @@ describe("bill tools (list/get/void/update)", () => {
   });
 
   it("get_bill fetches a single bill by id", async () => {
-    const mockFetch = mockFetchWith({ id: "bill-1" });
+    const mockFetch = mockFetchWith({ id: "2001" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "get_bill", arguments: { id: "bill-1" } });
+    const result = await client.callTool({ name: "get_bill", arguments: { id: "2001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/");
   });
 
   it("void_bill PUTs {void: true} to the void sub-resource", async () => {
-    const mockFetch = mockFetchWith({ id: "bill-1", status: "void" });
+    const mockFetch = mockFetchWith({ id: "2001", status: "void" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "void_bill", arguments: { id: "bill-1" } });
+    const result = await client.callTool({ name: "void_bill", arguments: { id: "2001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/void/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/void/");
     expect(options.method).toBe("PUT");
     expect(JSON.parse(options.body as string)).toEqual({ void: true });
   });
 
   it("create_bill POSTs items with title remapped to description", async () => {
-    const mockFetch = mockFetchWith({ id: "bill-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "2001" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -93,7 +93,7 @@ describe("bill tools (list/get/void/update)", () => {
         supplier: "sup-1",
         date: "2026-07-01",
         items: [
-          { title: "Hosting", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+          { title: "Hosting", quantity: "1", unit_value: "50.00", expense_category: "7001" },
         ],
       },
     });
@@ -103,7 +103,7 @@ describe("bill tools (list/get/void/update)", () => {
     expect(url).toBe("https://api.elorus.com/v1.2/bills/");
     const body = JSON.parse(options.body as string);
     expect(body.items).toEqual([
-      { description: "Hosting", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+      { description: "Hosting", quantity: "1", unit_value: "50.00", expense_category: "7001" },
     ]);
   });
 
@@ -116,7 +116,7 @@ describe("bill tools (list/get/void/update)", () => {
       arguments: {
         supplier: "sup-1",
         date: "2026-07-01",
-        items: [{ title: "Hosting", quantity: "1", expense_category: "cat-1" }],
+        items: [{ title: "Hosting", quantity: "1", expense_category: "7001" }],
       },
     });
 
@@ -139,7 +139,7 @@ describe("bill tools (list/get/void/update)", () => {
             quantity: "1",
             unit_value: "50.00",
             unit_total: "62.00",
-            expense_category: "cat-1",
+            expense_category: "7001",
           },
         ],
       },
@@ -150,23 +150,23 @@ describe("bill tools (list/get/void/update)", () => {
   });
 
   it("update_bill PATCHes directly when reference is not provided", async () => {
-    const mockFetch = mockFetchWith({ id: "bill-1", draft: false });
+    const mockFetch = mockFetchWith({ id: "2001", draft: false });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_bill",
-      arguments: { id: "bill-1", draft: false },
+      arguments: { id: "2001", draft: false },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/");
     expect(options.method).toBe("PATCH");
   });
 
   it("update_bill uses mergePut (GET then PUT) when reference is provided", async () => {
-    const current = { id: "bill-1", date: "2026-07-01", reference: "" };
+    const current = { id: "2001", date: "2026-07-01", reference: "" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -188,7 +188,7 @@ describe("bill tools (list/get/void/update)", () => {
 
     const result = await client.callTool({
       name: "update_bill",
-      arguments: { id: "bill-1", reference: "PO-123" },
+      arguments: { id: "2001", reference: "PO-123" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -209,11 +209,11 @@ describe("bill tools (list/get/void/update)", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "delete_bill", arguments: { id: "bill-1" } });
+    const result = await client.callTool({ name: "delete_bill", arguments: { id: "2001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/");
     expect(options.method).toBe("DELETE");
   });
 
@@ -246,15 +246,15 @@ describe("bill tools (list/get/void/update)", () => {
 
     const result = await client.callTool({
       name: "send_bill_email",
-      arguments: { id: "bill-1", subject: "Your bill" },
+      arguments: { id: "2001", subject: "Your bill" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [getUrl] = mockFetch.mock.calls[0] as [string];
-    expect(getUrl).toBe("https://api.elorus.com/v1.2/bills/bill-1/email/");
+    expect(getUrl).toBe("https://api.elorus.com/v1.2/bills/2001/email/");
     const [postUrl, options] = mockFetch.mock.calls[1] as [string, RequestInit];
-    expect(postUrl).toBe("https://api.elorus.com/v1.2/bills/bill-1/email/");
+    expect(postUrl).toBe("https://api.elorus.com/v1.2/bills/2001/email/");
     expect(JSON.parse(options.body as string)).toEqual({
       to: "supplier@example.com",
       subject: "Your bill",
@@ -277,11 +277,11 @@ describe("bill tools (list/get/void/update)", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "export_bill_pdf", arguments: { id: "bill-1" } });
+    const result = await client.callTool({ name: "export_bill_pdf", arguments: { id: "2001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/pdf/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/pdf/");
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].resource.mimeType).toBe("application/pdf");
   });

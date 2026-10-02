@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 /**
  * Maps a public resource_type value to its plural path segment under /v1.2/. All of these
@@ -25,7 +26,7 @@ export function registerAppliedCreditTools(server: McpServer, client: ElorusClie
         "and source documents of any credit notes/supplier credits applied to reduce its balance.",
       inputSchema: {
         resource_type: appliedCreditResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource to list applied credit for"),
+        resource_id: elorusId("The ID of the resource to list applied credit for"),
       },
     },
     async ({ resource_type, resource_id }) => {
@@ -44,8 +45,8 @@ export function registerAppliedCreditTools(server: McpServer, client: ElorusClie
         "credit's remaining balance and the target document's amount owed.",
       inputSchema: {
         resource_type: appliedCreditResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource the credit was applied to"),
-        applied_credit_id: z.string().describe("The ID of the applied-credit record to remove"),
+        resource_id: elorusId("The ID of the resource the credit was applied to"),
+        applied_credit_id: elorusId("The ID of the applied-credit record to remove"),
       },
     },
     async ({ resource_type, resource_id, applied_credit_id }) => {

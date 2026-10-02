@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 export function registerConfigTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -32,7 +33,7 @@ export function registerConfigTools(server: McpServer, client: ElorusClient): vo
     {
       description: "Fetch a single tax rate by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus tax ID"),
+        id: elorusId("The Elorus tax ID"),
       },
     },
     async ({ id }) => {
@@ -72,7 +73,7 @@ export function registerConfigTools(server: McpServer, client: ElorusClient): vo
     {
       description: "Fetch a single document type by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus document type ID"),
+        id: elorusId("The Elorus document type ID"),
       },
     },
     async ({ id }) => {
@@ -136,7 +137,7 @@ export function registerConfigTools(server: McpServer, client: ElorusClient): vo
     {
       description: "Fetch a single expense category by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus expense category ID"),
+        id: elorusId("The Elorus expense category ID"),
       },
     },
     async ({ id }) => {

@@ -37,17 +37,17 @@ describe("generic applied-credit tools", () => {
   });
 
   it("list_applied_credit GETs the resource's nested applied-credit sub-resource", async () => {
-    const mockFetch = mockFetchWith([{ id: "ac-1", amount: "50.00" }]);
+    const mockFetch = mockFetchWith([{ id: "1601", amount: "50.00" }]);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "list_applied_credit",
-      arguments: { resource_type: "invoice", resource_id: "inv-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/applied-credit/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/applied-credit/");
   });
 
   it("accepts suppliercredit as a resource_type", async () => {
@@ -56,12 +56,12 @@ describe("generic applied-credit tools", () => {
 
     const result = await client.callTool({
       name: "list_applied_credit",
-      arguments: { resource_type: "suppliercredit", resource_id: "sc-1" },
+      arguments: { resource_type: "suppliercredit", resource_id: "3001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/applied-credit/");
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/applied-credit/");
   });
 
   it("rejects a resource_type outside invoice/creditnote/suppliercredit without reaching the API", async () => {
@@ -70,7 +70,7 @@ describe("generic applied-credit tools", () => {
 
     const result = await client.callTool({
       name: "list_applied_credit",
-      arguments: { resource_type: "bill", resource_id: "bill-1" },
+      arguments: { resource_type: "bill", resource_id: "2001" },
     });
 
     expect(result.isError).toBe(true);
@@ -90,12 +90,12 @@ describe("generic applied-credit tools", () => {
 
     const result = await client.callTool({
       name: "unapply_credit",
-      arguments: { resource_type: "creditnote", resource_id: "cn-1", applied_credit_id: "ac-1" },
+      arguments: { resource_type: "creditnote", resource_id: "4001", applied_credit_id: "1601" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/applied-credit/ac-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/applied-credit/1601/");
     expect(options.method).toBe("DELETE");
   });
 });

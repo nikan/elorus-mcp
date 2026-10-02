@@ -83,7 +83,7 @@ describe("contact tools (handler-level)", () => {
   });
 
   it("create_contact POSTs a company contact", async () => {
-    const mockFetch = mockFetchWith({ id: "new-1", company: "Acme Corp" }, 201);
+    const mockFetch = mockFetchWith({ id: "2501", company: "Acme Corp" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -98,7 +98,7 @@ describe("contact tools (handler-level)", () => {
   });
 
   it("create_contact wraps email/phone into the API's array-of-objects shape", async () => {
-    const mockFetch = mockFetchWith({ id: "new-1", company: "Acme Corp" }, 201);
+    const mockFetch = mockFetchWith({ id: "2501", company: "Acme Corp" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -195,12 +195,12 @@ describe("contact tools (handler-level)", () => {
 
     const result = await client.callTool({
       name: "delete_contact",
-      arguments: { id: "contact-1" },
+      arguments: { id: "1302" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/contacts/contact-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/contacts/1302/");
     expect(options.method).toBe("DELETE");
   });
 });

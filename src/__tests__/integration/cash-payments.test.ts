@@ -42,29 +42,29 @@ describe("cash payment tools", () => {
 
     await client.callTool({
       name: "list_cash_payments",
-      arguments: { supplier: "sup-1", bill: "bill-1" },
+      arguments: { supplier: "sup-1", bill: "2001" },
     });
 
     const [url] = mockFetch.mock.calls[0] as [string];
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/v1.2/cashpayments/");
     expect(parsed.searchParams.get("contact")).toBe("sup-1");
-    expect(parsed.searchParams.get("purchase")).toBe("bill-1");
+    expect(parsed.searchParams.get("purchase")).toBe("2001");
   });
 
   it("get_cash_payment GETs /cashpayments/{id}/", async () => {
-    const mockFetch = mockFetchWith({ id: "cp-1", amount: "250.00" });
+    const mockFetch = mockFetchWith({ id: "1201", amount: "250.00" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "get_cash_payment", arguments: { id: "cp-1" } });
+    const result = await client.callTool({ name: "get_cash_payment", arguments: { id: "1201" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/cp-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/1201/");
   });
 
   it("record_cash_payment links to a bill via purchase_payments when bill is given", async () => {
-    const mockFetch = mockFetchWith({ id: "cp-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "1201" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -73,7 +73,7 @@ describe("cash payment tools", () => {
         supplier: "sup-1",
         date: "2026-07-01",
         amount: "250.00",
-        bill: "bill-1",
+        bill: "2001",
       },
     });
 
@@ -85,12 +85,12 @@ describe("cash payment tools", () => {
       date: "2026-07-01",
       amount: "250.00",
       transaction_type: "ip",
-      purchase_payments: [{ purchase: "bill-1", amount: "250.00" }],
+      purchase_payments: [{ purchase: "2001", amount: "250.00" }],
     });
   });
 
   it("record_cash_payment sends an empty purchase_payments array when no bill is given", async () => {
-    const mockFetch = mockFetchWith({ id: "cp-2" }, 201);
+    const mockFetch = mockFetchWith({ id: "1202" }, 201);
     const client = await connectedClient(elorusClient);
 
     await client.callTool({
@@ -105,7 +105,7 @@ describe("cash payment tools", () => {
   });
 
   it("update_cash_payment fetches the current record, merges fields, and PUTs", async () => {
-    const current = { id: "cp-1", date: "2026-07-01", amount: "250.00", title: "" };
+    const current = { id: "1201", date: "2026-07-01", amount: "250.00", title: "" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -127,7 +127,7 @@ describe("cash payment tools", () => {
 
     const result = await client.callTool({
       name: "update_cash_payment",
-      arguments: { id: "cp-1", title: "Starling ref 123" },
+      arguments: { id: "1201", title: "Starling ref 123" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -147,11 +147,11 @@ describe("cash payment tools", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "delete_cash_payment", arguments: { id: "cp-1" } });
+    const result = await client.callTool({ name: "delete_cash_payment", arguments: { id: "1201" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/cp-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/1201/");
     expect(options.method).toBe("DELETE");
   });
 
@@ -167,11 +167,11 @@ describe("cash payment tools", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "export_cash_payment_pdf", arguments: { id: "cp-1" } });
+    const result = await client.callTool({ name: "export_cash_payment_pdf", arguments: { id: "1201" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/cp-1/pdf/");
+    expect(url).toBe("https://api.elorus.com/v1.2/cashpayments/1201/pdf/");
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].resource.mimeType).toBe("application/pdf");
   });

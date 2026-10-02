@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { lineItemSchema, lineItemUpdateSchema } from "../schemas/line-item.js";
 import { splitEmailList } from "../email.js";
 
@@ -54,7 +55,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
     {
       description: "Fetch a single credit note by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus credit note ID"),
+        id: elorusId("The Elorus credit note ID"),
       },
     },
     async ({ id }) => {
@@ -77,7 +78,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
         "Updating items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id you " +
         "want to keep, or that line is deleted.",
       inputSchema: {
-        id: z.string().describe("The Elorus credit note ID to update"),
+        id: elorusId("The Elorus credit note ID to update"),
         custom_id: z.string().optional().describe("Custom/external ID for this credit note (PATCH-safe, any status)"),
         draft: z
           .boolean()
@@ -254,7 +255,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
       description:
         "Apply a credit note against an open invoice to reduce the amount owed. The credit note and invoice must belong to the same client.",
       inputSchema: {
-        id: z.string().describe("The credit note ID to apply"),
+        id: elorusId("The credit note ID to apply"),
         invoice: z.string().describe("The invoice ID to apply the credit against"),
         amount: z
           .string()
@@ -277,7 +278,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
         "prefer void_credit_note for issued credit notes with financial history; this is intended for " +
         "draft cleanup. This is a hard delete with no undo.",
       inputSchema: {
-        id: z.string().describe("The Elorus credit note ID to delete"),
+        id: elorusId("The Elorus credit note ID to delete"),
       },
     },
     async ({ id }) => {
@@ -294,7 +295,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
       description:
         "Void a credit note. A voided credit note cannot be edited or applied and is excluded from financial reports.",
       inputSchema: {
-        id: z.string().describe("The Elorus credit note ID to void"),
+        id: elorusId("The Elorus credit note ID to void"),
       },
     },
     async ({ id }) => {
@@ -312,7 +313,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
         "Email a credit note to the client. First fetches the organization's default recipient/subject/message " +
         "for this credit note, then overrides them with any fields you provide before sending.",
       inputSchema: {
-        id: z.string().describe("The Elorus credit note ID to send"),
+        id: elorusId("The Elorus credit note ID to send"),
         to: z
           .string()
           .email()
@@ -369,7 +370,7 @@ export function registerCreditNoteTools(server: McpServer, client: ElorusClient)
     {
       description: "Export a credit note as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
-        id: z.string().describe("The Elorus credit note ID to export"),
+        id: elorusId("The Elorus credit note ID to export"),
       },
     },
     async ({ id }) => {

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 export function registerCashPaymentTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -54,7 +55,7 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
     {
       description: "Fetch a single payment made to a supplier by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus cash payment ID"),
+        id: elorusId("The Elorus cash payment ID"),
       },
     },
     async ({ id }) => {
@@ -119,7 +120,7 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
         "Only provided fields are changed; the Elorus API only supports PUT on cash payments, so this " +
         "fetches the current record and merges your fields into it before saving.",
       inputSchema: {
-        id: z.string().describe("The Elorus cash payment ID to update"),
+        id: elorusId("The Elorus cash payment ID to update"),
         date: z.string().optional().describe("Payment date in YYYY-MM-DD format"),
         amount: z.string().optional().describe("Amount paid as a string, e.g. '250.00'"),
         title: z
@@ -144,7 +145,7 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
         "the bill's paid amount is reduced accordingly; a fully-paid bill with no remaining " +
         "payments can then be reverted to draft via update_bill. This is a hard delete with no undo.",
       inputSchema: {
-        id: z.string().describe("The Elorus cash payment ID to delete"),
+        id: elorusId("The Elorus cash payment ID to delete"),
       },
     },
     async ({ id }) => {
@@ -160,7 +161,7 @@ export function registerCashPaymentTools(server: McpServer, client: ElorusClient
     {
       description: "Export a cash payment as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
-        id: z.string().describe("The Elorus cash payment ID to export"),
+        id: elorusId("The Elorus cash payment ID to export"),
       },
     },
     async ({ id }) => {

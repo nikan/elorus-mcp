@@ -37,17 +37,17 @@ describe("list_sent_emails", () => {
   });
 
   it("GETs the resource's nested sent-email-messages sub-resource", async () => {
-    const mockFetch = mockFetchWith([{ id: "msg-1", to: "client@example.com" }]);
+    const mockFetch = mockFetchWith([{ id: "1701", to: "client@example.com" }]);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "list_sent_emails",
-      arguments: { resource_type: "invoice", resource_id: "inv-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/sent-email-messages/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/sent-email-messages/");
   });
 
   it("accepts every resource_type in the sent-email matrix, e.g. 'deliverynote'", async () => {
@@ -56,12 +56,12 @@ describe("list_sent_emails", () => {
 
     const result = await client.callTool({
       name: "list_sent_emails",
-      arguments: { resource_type: "deliverynote", resource_id: "dn-1" },
+      arguments: { resource_type: "deliverynote", resource_id: "1901" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/deliverynotes/dn-1/sent-email-messages/");
+    expect(url).toBe("https://api.elorus.com/v1.2/deliverynotes/1901/sent-email-messages/");
   });
 
   it("rejects a resource_type not in the sent-email matrix (e.g. 'contact') without reaching the API", async () => {
@@ -70,7 +70,7 @@ describe("list_sent_emails", () => {
 
     const result = await client.callTool({
       name: "list_sent_emails",
-      arguments: { resource_type: "contact", resource_id: "c-1" },
+      arguments: { resource_type: "contact", resource_id: "1301" },
     });
 
     expect(result.isError).toBe(true);

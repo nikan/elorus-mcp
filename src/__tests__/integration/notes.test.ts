@@ -42,26 +42,26 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "list_private_notes",
-      arguments: { resource_type: "invoice", resource_id: "inv-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/notes/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/notes/");
   });
 
   it("create_private_note POSTs {notes: body} to the resource's nested notes sub-resource", async () => {
-    const mockFetch = mockFetchWith({ id: "note-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "1401" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "create_private_note",
-      arguments: { resource_type: "contact", resource_id: "c-1", body: "Call back" },
+      arguments: { resource_type: "contact", resource_id: "1301", body: "Call back" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/contacts/c-1/notes/");
+    expect(url).toBe("https://api.elorus.com/v1.2/contacts/1301/notes/");
     expect(JSON.parse(options.body as string)).toEqual({ notes: "Call back" });
   });
 
@@ -71,25 +71,25 @@ describe("note & discussion tools", () => {
 
     await client.callTool({
       name: "list_client_discussions",
-      arguments: { resource_type: "invoice", resource_id: "inv-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001" },
     });
 
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/discussions/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/discussions/");
   });
 
   it("create_client_discussion POSTs {message: body} to the resource's nested discussions sub-resource", async () => {
-    const mockFetch = mockFetchWith({ id: "disc-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "1501" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "create_client_discussion",
-      arguments: { resource_type: "invoice", resource_id: "inv-1", body: "Thanks for your business" },
+      arguments: { resource_type: "invoice", resource_id: "1001", body: "Thanks for your business" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/discussions/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/discussions/");
     expect(JSON.parse(options.body as string)).toEqual({ message: "Thanks for your business" });
   });
 
@@ -99,7 +99,7 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "list_client_discussions",
-      arguments: { resource_type: "cashreceipt", resource_id: "cr-1" },
+      arguments: { resource_type: "cashreceipt", resource_id: "9001" },
     });
 
     expect(result.isError).toBe(true);
@@ -112,12 +112,12 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "list_private_notes",
-      arguments: { resource_type: "project", resource_id: "proj-1" },
+      arguments: { resource_type: "project", resource_id: "2201" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/projects/proj-1/notes/");
+    expect(url).toBe("https://api.elorus.com/v1.2/projects/2201/notes/");
   });
 
   it("rejects a resource_type not in the notes matrix (e.g. 'task') without reaching the API", async () => {
@@ -139,26 +139,26 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "list_client_discussions",
-      arguments: { resource_type: "estimate", resource_id: "est-1" },
+      arguments: { resource_type: "estimate", resource_id: "2301" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/estimates/est-1/discussions/");
+    expect(url).toBe("https://api.elorus.com/v1.2/estimates/2301/discussions/");
   });
 
   it("update_private_note PUTs {notes: body} to the note's own path", async () => {
-    const mockFetch = mockFetchWith({ id: "note-1", notes: "Updated" });
+    const mockFetch = mockFetchWith({ id: "1401", notes: "Updated" });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_private_note",
-      arguments: { resource_type: "contact", resource_id: "c-1", note_id: "note-1", body: "Updated" },
+      arguments: { resource_type: "contact", resource_id: "1301", note_id: "1401", body: "Updated" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/contacts/c-1/notes/note-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/contacts/1301/notes/1401/");
     expect(options.method).toBe("PUT");
     expect(JSON.parse(options.body as string)).toEqual({ notes: "Updated" });
   });
@@ -176,32 +176,32 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "delete_private_note",
-      arguments: { resource_type: "contact", resource_id: "c-1", note_id: "note-1" },
+      arguments: { resource_type: "contact", resource_id: "1301", note_id: "1401" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/contacts/c-1/notes/note-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/contacts/1301/notes/1401/");
     expect(options.method).toBe("DELETE");
   });
 
   it("update_client_discussion PUTs {message: body} to the discussion's own path", async () => {
-    const mockFetch = mockFetchWith({ id: "disc-1", message: "Updated" });
+    const mockFetch = mockFetchWith({ id: "1501", message: "Updated" });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_client_discussion",
       arguments: {
         resource_type: "invoice",
-        resource_id: "inv-1",
-        discussion_id: "disc-1",
+        resource_id: "1001",
+        discussion_id: "1501",
         body: "Updated",
       },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/discussions/disc-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/discussions/1501/");
     expect(options.method).toBe("PUT");
     expect(JSON.parse(options.body as string)).toEqual({ message: "Updated" });
   });
@@ -219,12 +219,12 @@ describe("note & discussion tools", () => {
 
     const result = await client.callTool({
       name: "delete_client_discussion",
-      arguments: { resource_type: "invoice", resource_id: "inv-1", discussion_id: "disc-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001", discussion_id: "1501" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/discussions/disc-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/discussions/1501/");
     expect(options.method).toBe("DELETE");
   });
 });

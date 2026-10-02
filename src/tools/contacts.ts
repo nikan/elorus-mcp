@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 export function registerContactTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -55,7 +56,7 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
     {
       description: "Fetch a single contact by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus contact ID"),
+        id: elorusId("The Elorus contact ID"),
       },
     },
     async ({ id }) => {
@@ -136,7 +137,7 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
         "Update fields on an existing contact. Only provided fields are changed (PATCH semantics); " +
         "the Elorus API only supports PUT on contacts, so this fetches the current record and merges your fields into it before saving.",
       inputSchema: {
-        id: z.string().describe("The Elorus contact ID to update"),
+        id: elorusId("The Elorus contact ID to update"),
         company: z.string().optional().describe("Company name"),
         first_name: z.string().optional().describe("First name"),
         last_name: z.string().optional().describe("Last name"),
@@ -178,7 +179,7 @@ export function registerContactTools(server: McpServer, client: ElorusClient): v
         "be archived instead via update_contact with active: false. Confirm the ID is correct first " +
         "(e.g. via get_contact).",
       inputSchema: {
-        id: z.string().describe("The Elorus contact ID to delete"),
+        id: elorusId("The Elorus contact ID to delete"),
       },
     },
     async ({ id }) => {
