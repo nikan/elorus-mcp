@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { billLineItemSchema, billLineItemUpdateSchema } from "../schemas/bill-line-item.js";
 import { splitEmailList } from "../email.js";
 
@@ -54,7 +55,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
     {
       description: "Fetch a single supplier credit by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus supplier credit ID"),
+        id: elorusId("The Elorus supplier credit ID"),
       },
     },
     async ({ id }) => {
@@ -79,7 +80,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
         "title (mapped to the API's description) and a required expense_category per line, not the " +
         "invoice-style shape.",
       inputSchema: {
-        id: z.string().describe("The Elorus supplier credit ID to update"),
+        id: elorusId("The Elorus supplier credit ID to update"),
         custom_id: z
           .string()
           .optional()
@@ -297,7 +298,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
       description:
         "Apply a supplier credit against an open bill to reduce the amount owed to the supplier.",
       inputSchema: {
-        id: z.string().describe("The supplier credit ID to apply"),
+        id: elorusId("The supplier credit ID to apply"),
         bill: z.string().describe("The bill ID to apply the supplier credit against"),
         amount: z
           .string()
@@ -322,7 +323,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
         "entirely — prefer void_supplier_credit for issued supplier credits with financial history; " +
         "this is intended for draft cleanup. This is a hard delete with no undo.",
       inputSchema: {
-        id: z.string().describe("The Elorus supplier credit ID to delete"),
+        id: elorusId("The Elorus supplier credit ID to delete"),
       },
     },
     async ({ id }) => {
@@ -339,7 +340,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
       description:
         "Void a supplier credit. A voided supplier credit cannot be edited or applied and is excluded from financial reports.",
       inputSchema: {
-        id: z.string().describe("The Elorus supplier credit ID to void"),
+        id: elorusId("The Elorus supplier credit ID to void"),
       },
     },
     async ({ id }) => {
@@ -358,7 +359,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
         "recipient/subject/message for this supplier credit, then overrides them with any fields you " +
         "provide before sending.",
       inputSchema: {
-        id: z.string().describe("The Elorus supplier credit ID to send"),
+        id: elorusId("The Elorus supplier credit ID to send"),
         to: z
           .string()
           .email()
@@ -415,7 +416,7 @@ export function registerSupplierCreditTools(server: McpServer, client: ElorusCli
     {
       description: "Export a supplier credit as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
-        id: z.string().describe("The Elorus supplier credit ID to export"),
+        id: elorusId("The Elorus supplier credit ID to export"),
       },
     },
     async ({ id }) => {

@@ -53,7 +53,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("create_credit_note POSTs a valid credit note", async () => {
-    const mockFetch = mockFetchWith({ id: "cn-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "4001" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -61,7 +61,7 @@ describe("credit note tools (list/apply)", () => {
       arguments: {
         client: "client-1",
         date: "2026-07-01",
-        documenttype: "doctype-1",
+        documenttype: "8001",
         items: [{ title: "Refund", quantity: "1", unit_value: "50.00" }],
       },
     });
@@ -73,7 +73,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("create_credit_note maps notes to public_notes", async () => {
-    const mockFetch = mockFetchWith({ id: "cn-2" }, 201);
+    const mockFetch = mockFetchWith({ id: "4002" }, 201);
     const client = await connectedClient(elorusClient);
 
     await client.callTool({
@@ -81,7 +81,7 @@ describe("credit note tools (list/apply)", () => {
       arguments: {
         client: "client-1",
         date: "2026-07-01",
-        documenttype: "doctype-1",
+        documenttype: "8001",
         notes: "Refund for damaged goods",
         items: [{ title: "Refund", quantity: "1", unit_value: "50.00" }],
       },
@@ -102,7 +102,7 @@ describe("credit note tools (list/apply)", () => {
       arguments: {
         client: "client-1",
         date: "2026-07-01",
-        documenttype: "doctype-1",
+        documenttype: "8001",
         items: [{ title: "Refund", quantity: "1" }],
       },
     });
@@ -117,45 +117,45 @@ describe("credit note tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "apply_credit_note",
-      arguments: { id: "cn-1", invoice: "inv-1", amount: "150.00" },
+      arguments: { id: "4001", invoice: "1001", amount: "150.00" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/applied-credit/");
-    expect(JSON.parse(options.body as string)).toEqual([{ invoice: "inv-1", amount: "150.00" }]);
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/applied-credit/");
+    expect(JSON.parse(options.body as string)).toEqual([{ invoice: "1001", amount: "150.00" }]);
   });
 
   it("get_credit_note fetches a single credit note by id", async () => {
-    const mockFetch = mockFetchWith({ id: "cn-1" });
+    const mockFetch = mockFetchWith({ id: "4001" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "get_credit_note", arguments: { id: "cn-1" } });
+    const result = await client.callTool({ name: "get_credit_note", arguments: { id: "4001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/");
   });
 
   it("update_credit_note PATCHes directly when only PATCH-safe fields are given", async () => {
-    const mockFetch = mockFetchWith({ id: "cn-1", custom_id: "PO-9" });
+    const mockFetch = mockFetchWith({ id: "4001", custom_id: "PO-9" });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_credit_note",
-      arguments: { id: "cn-1", custom_id: "PO-9" },
+      arguments: { id: "4001", custom_id: "PO-9" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/");
     expect(options.method).toBe("PATCH");
     expect(JSON.parse(options.body as string)).toEqual({ custom_id: "PO-9" });
   });
 
   it("update_credit_note uses GET-then-PUT for date when the credit note is a draft", async () => {
-    const current = { id: "cn-1", draft: true, date: "2026-07-01", client: "client-1" };
+    const current = { id: "4001", draft: true, date: "2026-07-01", client: "client-1" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -177,7 +177,7 @@ describe("credit note tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_credit_note",
-      arguments: { id: "cn-1", date: "2026-07-05" },
+      arguments: { id: "4001", date: "2026-07-05" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -188,7 +188,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("update_credit_note rejects a draft-only field (e.g. date) when not a draft, without PUTting", async () => {
-    const current = { id: "cn-1", draft: false, date: "2026-07-01" };
+    const current = { id: "4001", draft: false, date: "2026-07-01" };
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -201,7 +201,7 @@ describe("credit note tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_credit_note",
-      arguments: { id: "cn-1", date: "2026-07-05" },
+      arguments: { id: "4001", date: "2026-07-05" },
     });
 
     expect(result.isError).toBe(true);
@@ -209,7 +209,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("update_credit_note rejects calculator_mode alone when not a draft, without an empty PATCH", async () => {
-    const current = { id: "cn-1", draft: false, date: "2026-07-01" };
+    const current = { id: "4001", draft: false, date: "2026-07-01" };
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -222,7 +222,7 @@ describe("credit note tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_credit_note",
-      arguments: { id: "cn-1", calculator_mode: "total" },
+      arguments: { id: "4001", calculator_mode: "total" },
     });
 
     expect(result.isError).toBe(true);
@@ -231,7 +231,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("update_credit_note preserves an existing line item's id in the outgoing PUT body", async () => {
-    const current = { id: "cn-1", draft: true, date: "2026-07-01" };
+    const current = { id: "4001", draft: true, date: "2026-07-01" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -254,7 +254,7 @@ describe("credit note tools (list/apply)", () => {
     const result = await client.callTool({
       name: "update_credit_note",
       arguments: {
-        id: "cn-1",
+        id: "4001",
         items: [{ id: "line-1", title: "Refund", quantity: "1", unit_value: "50.00" }],
       },
     });
@@ -266,7 +266,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("update_credit_note persists calculator_mode on the draft-only PUT path", async () => {
-    const current = { id: "cn-1", draft: true, date: "2026-07-01", calculator_mode: "initial" };
+    const current = { id: "4001", draft: true, date: "2026-07-01", calculator_mode: "initial" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -288,7 +288,7 @@ describe("credit note tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_credit_note",
-      arguments: { id: "cn-1", calculator_mode: "total" },
+      arguments: { id: "4001", calculator_mode: "total" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -300,7 +300,7 @@ describe("credit note tools (list/apply)", () => {
   });
 
   it("update_credit_note validates unit_total items against the document's current calculator_mode when the argument is omitted", async () => {
-    const current = { id: "cn-1", draft: true, date: "2026-07-01", calculator_mode: "total" };
+    const current = { id: "4001", draft: true, date: "2026-07-01", calculator_mode: "total" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -323,7 +323,7 @@ describe("credit note tools (list/apply)", () => {
     const result = await client.callTool({
       name: "update_credit_note",
       arguments: {
-        id: "cn-1",
+        id: "4001",
         items: [{ title: "Refund", quantity: "1", unit_total: "62.00" }],
       },
     });
@@ -347,23 +347,23 @@ describe("credit note tools (list/apply)", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "delete_credit_note", arguments: { id: "cn-1" } });
+    const result = await client.callTool({ name: "delete_credit_note", arguments: { id: "4001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/");
     expect(options.method).toBe("DELETE");
   });
 
   it("void_credit_note PUTs {void: true} to the void sub-resource", async () => {
-    const mockFetch = mockFetchWith({ id: "cn-1", status: "void" });
+    const mockFetch = mockFetchWith({ id: "4001", status: "void" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "void_credit_note", arguments: { id: "cn-1" } });
+    const result = await client.callTool({ name: "void_credit_note", arguments: { id: "4001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/void/");
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/void/");
     expect(options.method).toBe("PUT");
     expect(JSON.parse(options.body as string)).toEqual({ void: true });
   });
@@ -397,15 +397,15 @@ describe("credit note tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "send_credit_note_email",
-      arguments: { id: "cn-1" },
+      arguments: { id: "4001" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [getUrl] = mockFetch.mock.calls[0] as [string];
-    expect(getUrl).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/email/");
+    expect(getUrl).toBe("https://api.elorus.com/v1.2/creditnotes/4001/email/");
     const [postUrl, options] = mockFetch.mock.calls[1] as [string, RequestInit];
-    expect(postUrl).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/email/");
+    expect(postUrl).toBe("https://api.elorus.com/v1.2/creditnotes/4001/email/");
     expect(JSON.parse(options.body as string)).toEqual({
       to: "client@example.com",
       subject: "Default subject",
@@ -428,11 +428,11 @@ describe("credit note tools (list/apply)", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "export_credit_note_pdf", arguments: { id: "cn-1" } });
+    const result = await client.callTool({ name: "export_credit_note_pdf", arguments: { id: "4001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/cn-1/pdf/");
+    expect(url).toBe("https://api.elorus.com/v1.2/creditnotes/4001/pdf/");
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].resource.mimeType).toBe("application/pdf");
   });

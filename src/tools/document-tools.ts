@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { splitEmailList } from "../email.js";
 
 const textResult = (result: unknown) => ({
@@ -25,7 +26,7 @@ export function registerDocumentTools(
 ): void {
   const { singular, plural, path, createFields, updateFields, patchFields, listFields } = config;
   const label = singular.replaceAll("_", " ");
-  const idSchema = { id: z.string().min(1).describe(`Elorus ${label} ID`) };
+  const idSchema = { id: elorusId(`Elorus ${label} ID`) };
   const optionalUpdateFields = z.object(updateFields).partial().shape;
 
   server.registerTool(`list_${plural}`, {

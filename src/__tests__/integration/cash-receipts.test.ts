@@ -54,7 +54,7 @@ describe("cash receipt tools", () => {
 
     const result = await client.callTool({
       name: "list_cash_receipts",
-      arguments: { client: "client-1", invoice: "inv-1" },
+      arguments: { client: "client-1", invoice: "1001" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -62,22 +62,22 @@ describe("cash receipt tools", () => {
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/v1.2/cashreceipts/");
     expect(parsed.searchParams.get("contact")).toBe("client-1");
-    expect(parsed.searchParams.get("invoice")).toBe("inv-1");
+    expect(parsed.searchParams.get("invoice")).toBe("1001");
   });
 
   it("get_cash_receipt GETs /cashreceipts/{id}/", async () => {
-    const mockFetch = mockFetchWith({ id: "cr-1", amount: "500.00" });
+    const mockFetch = mockFetchWith({ id: "9001", amount: "500.00" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "get_cash_receipt", arguments: { id: "cr-1" } });
+    const result = await client.callTool({ name: "get_cash_receipt", arguments: { id: "9001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/cr-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/9001/");
   });
 
   it("record_cash_receipt maps client/invoice to contact/invoice_payments and POSTs to /cashreceipts/", async () => {
-    const mockFetch = mockFetchWith({ id: "cr-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "9001" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -86,7 +86,7 @@ describe("cash receipt tools", () => {
         client: "client-1",
         date: "2026-07-01",
         amount: "500.00",
-        invoice: "inv-1",
+        invoice: "1001",
       },
     });
 
@@ -98,12 +98,12 @@ describe("cash receipt tools", () => {
       date: "2026-07-01",
       amount: "500.00",
       transaction_type: "ip",
-      invoice_payments: [{ invoice: "inv-1", amount: "500.00" }],
+      invoice_payments: [{ invoice: "1001", amount: "500.00" }],
     });
   });
 
   it("record_cash_receipt sends an empty invoice_payments array when no invoice is given", async () => {
-    const mockFetch = mockFetchWith({ id: "cr-2" }, 201);
+    const mockFetch = mockFetchWith({ id: "9002" }, 201);
     const client = await connectedClient(elorusClient);
 
     await client.callTool({
@@ -121,18 +121,18 @@ describe("cash receipt tools", () => {
     const mockFetch = mockFetchPdf();
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "export_cash_receipt_pdf", arguments: { id: "cr-1" } });
+    const result = await client.callTool({ name: "export_cash_receipt_pdf", arguments: { id: "9001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/cr-1/pdf/");
+    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/9001/pdf/");
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].type).toBe("resource");
     expect(content[0].resource.mimeType).toBe("application/pdf");
   });
 
   it("update_cash_receipt fetches the current record, merges fields, and PUTs", async () => {
-    const current = { id: "cr-1", date: "2026-07-01", amount: "500.00", title: "" };
+    const current = { id: "9001", date: "2026-07-01", amount: "500.00", title: "" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -154,7 +154,7 @@ describe("cash receipt tools", () => {
 
     const result = await client.callTool({
       name: "update_cash_receipt",
-      arguments: { id: "cr-1", amount: "600.00" },
+      arguments: { id: "9001", amount: "600.00" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -174,11 +174,11 @@ describe("cash receipt tools", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "delete_cash_receipt", arguments: { id: "cr-1" } });
+    const result = await client.callTool({ name: "delete_cash_receipt", arguments: { id: "9001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/cr-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/cashreceipts/9001/");
     expect(options.method).toBe("DELETE");
   });
 });

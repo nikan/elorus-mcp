@@ -74,18 +74,18 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
   });
 
   it("get_expense fetches a single expense by id", async () => {
-    const mockFetch = mockFetchWith({ id: "exp-1", date: "2026-07-01" });
+    const mockFetch = mockFetchWith({ id: "6001", date: "2026-07-01" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "get_expense", arguments: { id: "exp-1" } });
+    const result = await client.callTool({ name: "get_expense", arguments: { id: "6001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/expenses/exp-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/expenses/6001/");
   });
 
   it("update_expense fetches the current record, merges fields, and PUTs", async () => {
-    const current = { id: "exp-1", date: "2026-07-01", reference: "" };
+    const current = { id: "6001", date: "2026-07-01", reference: "" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -107,7 +107,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
 
     const result = await client.callTool({
       name: "update_expense",
-      arguments: { id: "exp-1", reference: "REIMB-1" },
+      arguments: { id: "6001", reference: "REIMB-1" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -118,7 +118,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
 
   it("update_expense with expense_category applies the category to every item from a single fetched snapshot", async () => {
     const current = {
-      id: "exp-1",
+      id: "6001",
       date: "2026-07-01",
       items: [
         { id: "item-1", expense_category: "old-cat", amount: "10.00" },
@@ -146,7 +146,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
 
     const result = await client.callTool({
       name: "update_expense",
-      arguments: { id: "exp-1", expense_category: "new-cat" },
+      arguments: { id: "6001", expense_category: "new-cat" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -162,6 +162,107 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     ]);
   });
 
+  it("update_expense with items replaces the line items, so amounts can be corrected", async () => {
+    const current = {
+      id: "6001",
+      date: "2026-09-30",
+      calculator_mode: "initial",
+      items: [
+        { id: "item-1", expense_category: "cat-1", amount: "16.21", description: "provisional" },
+      ],
+    };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_expense",
+      arguments: {
+        id: "6001",
+        items: [
+          { expense_category: "cat-1", amount: "16.34", description: "trued up to statement" },
+        ],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items).toEqual([
+      { expense_category: "cat-1", amount: "16.34", description: "trued up to statement" },
+    ]);
+  });
+
+  it("update_expense maps item taxes into the {tax, auto_calculate} shape the API expects", async () => {
+    const current = { id: "6001", items: [{ id: "item-1", expense_category: "cat-1", amount: "10.00" }] };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        json: () => Promise.resolve(current),
+      });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = await connectedClient(elorusClient);
+
+    await client.callTool({
+      name: "update_expense",
+      arguments: {
+        id: "6001",
+        items: [{ expense_category: "cat-1", amount: "10.00", taxes: ["tax-1"] }],
+      },
+    });
+
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(JSON.parse(putOptions.body as string).items[0].taxes).toEqual([
+      { tax: "tax-1", auto_calculate: true },
+    ]);
+  });
+
+  it("update_expense rejects items together with expense_category instead of silently picking one", async () => {
+    const mockFetch = mockFetchWith({ id: "6001" });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_expense",
+      arguments: {
+        id: "6001",
+        expense_category: "new-cat",
+        items: [{ expense_category: "cat-1", amount: "1.00" }],
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("not both");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("add_expense_attachment uploads the file then PATCHes it primary by default", async () => {
     const mockFetch = vi
       .fn()
@@ -170,30 +271,30 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
         status: 201,
         statusText: "Created",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: false }),
+        json: () => Promise.resolve({ id: "5001", primary: false }),
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: true }),
+        json: () => Promise.resolve({ id: "5001", primary: true }),
       });
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "add_expense_attachment",
-      arguments: { id: "exp-1", filename: "receipt.pdf", content_base64: "AAAA" },
+      arguments: { id: "6001", filename: "receipt.pdf", content_base64: "AAAA" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [uploadUrl, uploadOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/expenses/exp-1/attachments/");
+    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/expenses/6001/attachments/");
     expect(uploadOptions.method).toBe("POST");
     const [patchUrl, patchOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
-    expect(patchUrl).toBe("https://api.elorus.com/v1.2/expenses/exp-1/attachments/att-1/");
+    expect(patchUrl).toBe("https://api.elorus.com/v1.2/expenses/6001/attachments/5001/");
     expect(JSON.parse(patchOptions.body as string)).toEqual({ primary: true });
   });
 
@@ -203,14 +304,14 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
       status: 201,
       statusText: "Created",
       headers: new Headers(),
-      json: () => Promise.resolve({ id: "att-1", primary: false }),
+      json: () => Promise.resolve({ id: "5001", primary: false }),
     });
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "add_expense_attachment",
-      arguments: { id: "exp-1", filename: "receipt.pdf", content_base64: "AAAA", primary: false },
+      arguments: { id: "6001", filename: "receipt.pdf", content_base64: "AAAA", primary: false },
     });
 
     expect(result.isError).toBeFalsy();
@@ -225,14 +326,14 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
         status: 201,
         statusText: "Created",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: false }),
+        json: () => Promise.resolve({ id: "5001", primary: false }),
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: true }),
+        json: () => Promise.resolve({ id: "5001", primary: true }),
       });
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
@@ -244,7 +345,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     try {
       const result = await client.callTool({
         name: "add_expense_attachment",
-        arguments: { id: "exp-1", file_path: tmpFile },
+        arguments: { id: "6001", file_path: tmpFile },
       });
 
       expect(result.isError).toBeFalsy();
@@ -269,7 +370,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     try {
       const result = await client.callTool({
         name: "add_expense_attachment",
-        arguments: { id: "exp-1", file_path: tmpFile },
+        arguments: { id: "6001", file_path: tmpFile },
       });
 
       expect(result.isError).toBe(true);
@@ -289,7 +390,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     try {
       const result = await client.callTool({
         name: "add_expense_attachment",
-        arguments: { id: "exp-1", file_path: tmpFile },
+        arguments: { id: "6001", file_path: tmpFile },
       });
 
       expect(result.isError).toBe(true);
@@ -305,7 +406,7 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
 
     const result = await client.callTool({
       name: "add_expense_attachment",
-      arguments: { id: "exp-1", filename: "receipt.pdf" },
+      arguments: { id: "6001", filename: "receipt.pdf" },
     });
 
     expect(result.isError).toBe(true);
@@ -316,11 +417,11 @@ describe("expense tools (list/get/update/attachments/pdf)", () => {
     const mockFetch = mockFetchPdf();
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "export_expense_pdf", arguments: { id: "exp-1" } });
+    const result = await client.callTool({ name: "export_expense_pdf", arguments: { id: "6001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/expenses/exp-1/pdf/");
+    expect(url).toBe("https://api.elorus.com/v1.2/expenses/6001/pdf/");
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].type).toBe("resource");
     expect(content[0].resource.mimeType).toBe("application/pdf");

@@ -45,26 +45,26 @@ describe("generic attachment tools", () => {
 
     const result = await client.callTool({
       name: "list_attachments",
-      arguments: { resource_type: "invoice", resource_id: "inv-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/attachments/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/attachments/");
   });
 
   it("get_attachment GETs the attachment's own path", async () => {
-    const mockFetch = mockFetchWith({ id: "att-1", title: "Receipt" });
+    const mockFetch = mockFetchWith({ id: "5001", title: "Receipt" });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "get_attachment",
-      arguments: { resource_type: "bill", resource_id: "bill-1", attachment_id: "att-1" },
+      arguments: { resource_type: "bill", resource_id: "2001", attachment_id: "5001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/attachments/att-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/attachments/5001/");
   });
 
   it("rejects a resource_type not in the attachments matrix (e.g. 'goodsreceipt') without reaching the API", async () => {
@@ -73,7 +73,7 @@ describe("generic attachment tools", () => {
 
     const result = await client.callTool({
       name: "list_attachments",
-      arguments: { resource_type: "goodsreceipt", resource_id: "gr-1" },
+      arguments: { resource_type: "goodsreceipt", resource_id: "1801" },
     });
 
     expect(result.isError).toBe(true);
@@ -89,14 +89,14 @@ describe("generic attachment tools", () => {
         status: 201,
         statusText: "Created",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: false }),
+        json: () => Promise.resolve({ id: "5001", primary: false }),
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: true }),
+        json: () => Promise.resolve({ id: "5001", primary: true }),
       });
     vi.stubGlobal("fetch", mockFetch);
 
@@ -104,7 +104,7 @@ describe("generic attachment tools", () => {
       name: "add_attachment",
       arguments: {
         resource_type: "contact",
-        resource_id: "c-1",
+        resource_id: "1301",
         filename: "id-card.pdf",
         content_base64: "AAAA",
       },
@@ -113,10 +113,10 @@ describe("generic attachment tools", () => {
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [uploadUrl, uploadOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/contacts/c-1/attachments/");
+    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/contacts/1301/attachments/");
     expect(uploadOptions.method).toBe("POST");
     const [patchUrl, patchOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
-    expect(patchUrl).toBe("https://api.elorus.com/v1.2/contacts/c-1/attachments/att-1/");
+    expect(patchUrl).toBe("https://api.elorus.com/v1.2/contacts/1301/attachments/5001/");
     expect(JSON.parse(patchOptions.body as string)).toEqual({ primary: true });
   });
 
@@ -127,7 +127,7 @@ describe("generic attachment tools", () => {
       status: 201,
       statusText: "Created",
       headers: new Headers(),
-      json: () => Promise.resolve({ id: "att-1", primary: false }),
+      json: () => Promise.resolve({ id: "5001", primary: false }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
@@ -138,7 +138,7 @@ describe("generic attachment tools", () => {
     try {
       const result = await client.callTool({
         name: "add_attachment",
-        arguments: { resource_type: "expense", resource_id: "exp-1", file_path: tmpFile, primary: false },
+        arguments: { resource_type: "expense", resource_id: "6001", file_path: tmpFile, primary: false },
       });
 
       expect(result.isError).toBeFalsy();
@@ -153,17 +153,17 @@ describe("generic attachment tools", () => {
   });
 
   it("update_attachment PATCHes only the provided fields", async () => {
-    const mockFetch = mockFetchWith({ id: "att-1", title: "Renamed", primary: true });
+    const mockFetch = mockFetchWith({ id: "5001", title: "Renamed", primary: true });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_attachment",
-      arguments: { resource_type: "invoice", resource_id: "inv-1", attachment_id: "att-1", title: "Renamed" },
+      arguments: { resource_type: "invoice", resource_id: "1001", attachment_id: "5001", title: "Renamed" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/attachments/att-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/attachments/5001/");
     expect(options.method).toBe("PATCH");
     expect(JSON.parse(options.body as string)).toEqual({ title: "Renamed" });
   });
@@ -174,7 +174,7 @@ describe("generic attachment tools", () => {
 
     const result = await client.callTool({
       name: "update_attachment",
-      arguments: { resource_type: "invoice", resource_id: "inv-1", attachment_id: "att-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001", attachment_id: "5001" },
     });
 
     expect(result.isError).toBe(true);
@@ -194,12 +194,12 @@ describe("generic attachment tools", () => {
 
     const result = await client.callTool({
       name: "delete_attachment",
-      arguments: { resource_type: "invoice", resource_id: "inv-1", attachment_id: "att-1" },
+      arguments: { resource_type: "invoice", resource_id: "1001", attachment_id: "5001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/invoices/inv-1/attachments/att-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/attachments/5001/");
     expect(options.method).toBe("DELETE");
   });
 
@@ -220,12 +220,12 @@ describe("generic attachment tools", () => {
 
     const result = await client.callTool({
       name: "download_attachment",
-      arguments: { resource_type: "bill", resource_id: "bill-1", attachment_id: "att-1" },
+      arguments: { resource_type: "bill", resource_id: "2001", attachment_id: "5001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/bills/bill-1/attachments/att-1/file/");
+    expect(url).toBe("https://api.elorus.com/v1.2/bills/2001/attachments/5001/file/");
     expect((options.headers as Record<string, string>).Accept).toBe("*/*");
     const content = result.content as Array<{ type: string; resource: { mimeType: string; blob: string } }>;
     expect(content[0].resource.mimeType).toBe("image/jpeg");

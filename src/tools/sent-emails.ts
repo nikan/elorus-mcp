@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 /** Maps a public resource_type value to its plural path segment under /v1.2/. All of these pluralize with a trailing 's'. */
 const SENT_EMAIL_RESOURCE_TYPES = [
@@ -26,7 +27,7 @@ export function registerSentEmailTools(server: McpServer, client: ElorusClient):
         "including recipient, subject, and send timestamp.",
       inputSchema: {
         resource_type: sentEmailResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource to fetch the sent-email log for"),
+        resource_id: elorusId("The ID of the resource to fetch the sent-email log for"),
       },
     },
     async ({ resource_type, resource_id }) => {

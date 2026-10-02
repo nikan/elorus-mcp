@@ -53,7 +53,7 @@ describe("supplier credit tools (list/apply)", () => {
   });
 
   it("create_supplier_credit POSTs items with title remapped to description", async () => {
-    const mockFetch = mockFetchWith({ id: "sc-1" }, 201);
+    const mockFetch = mockFetchWith({ id: "3001" }, 201);
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
@@ -61,9 +61,9 @@ describe("supplier credit tools (list/apply)", () => {
       arguments: {
         supplier: "sup-1",
         date: "2026-07-01",
-        documenttype: "doctype-1",
+        documenttype: "8001",
         items: [
-          { title: "Refund", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+          { title: "Refund", quantity: "1", unit_value: "50.00", expense_category: "7001" },
         ],
       },
     });
@@ -74,12 +74,12 @@ describe("supplier credit tools (list/apply)", () => {
     const body = JSON.parse(options.body as string);
     expect(body).toMatchObject({ supplier: "sup-1" });
     expect(body.items).toEqual([
-      { description: "Refund", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+      { description: "Refund", quantity: "1", unit_value: "50.00", expense_category: "7001" },
     ]);
   });
 
   it("create_supplier_credit maps notes to public_notes", async () => {
-    const mockFetch = mockFetchWith({ id: "sc-2" }, 201);
+    const mockFetch = mockFetchWith({ id: "3002" }, 201);
     const client = await connectedClient(elorusClient);
 
     await client.callTool({
@@ -87,10 +87,10 @@ describe("supplier credit tools (list/apply)", () => {
       arguments: {
         supplier: "sup-1",
         date: "2026-07-01",
-        documenttype: "doctype-1",
+        documenttype: "8001",
         notes: "Price correction",
         items: [
-          { title: "Refund", quantity: "1", unit_value: "50.00", expense_category: "cat-1" },
+          { title: "Refund", quantity: "1", unit_value: "50.00", expense_category: "7001" },
         ],
       },
     });
@@ -110,8 +110,8 @@ describe("supplier credit tools (list/apply)", () => {
       arguments: {
         supplier: "sup-1",
         date: "2026-07-01",
-        documenttype: "doctype-1",
-        items: [{ title: "Refund", quantity: "1", expense_category: "cat-1" }],
+        documenttype: "8001",
+        items: [{ title: "Refund", quantity: "1", expense_category: "7001" }],
       },
     });
 
@@ -125,45 +125,45 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "apply_supplier_credit",
-      arguments: { id: "sc-1", bill: "bill-1", amount: "100.00" },
+      arguments: { id: "3001", bill: "2001", amount: "100.00" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/applied-credit/");
-    expect(JSON.parse(options.body as string)).toEqual([{ purchase: "bill-1", amount: "100.00" }]);
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/applied-credit/");
+    expect(JSON.parse(options.body as string)).toEqual([{ purchase: "2001", amount: "100.00" }]);
   });
 
   it("get_supplier_credit fetches a single supplier credit by id", async () => {
-    const mockFetch = mockFetchWith({ id: "sc-1" });
+    const mockFetch = mockFetchWith({ id: "3001" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "get_supplier_credit", arguments: { id: "sc-1" } });
+    const result = await client.callTool({ name: "get_supplier_credit", arguments: { id: "3001" } });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/");
   });
 
   it("update_supplier_credit PATCHes directly when only PATCH-safe fields are given", async () => {
-    const mockFetch = mockFetchWith({ id: "sc-1", draft: false });
+    const mockFetch = mockFetchWith({ id: "3001", draft: false });
     const client = await connectedClient(elorusClient);
 
     const result = await client.callTool({
       name: "update_supplier_credit",
-      arguments: { id: "sc-1", draft: false },
+      arguments: { id: "3001", draft: false },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/");
     expect(options.method).toBe("PATCH");
     expect(JSON.parse(options.body as string)).toEqual({ draft: false });
   });
 
   it("update_supplier_credit uses GET-then-PUT for reference when the supplier credit is a draft", async () => {
-    const current = { id: "sc-1", draft: true, date: "2026-07-01", reference: "" };
+    const current = { id: "3001", draft: true, date: "2026-07-01", reference: "" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -185,7 +185,7 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_supplier_credit",
-      arguments: { id: "sc-1", reference: "PO-123" },
+      arguments: { id: "3001", reference: "PO-123" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -196,7 +196,7 @@ describe("supplier credit tools (list/apply)", () => {
   });
 
   it("update_supplier_credit rejects a draft-only field (e.g. reference) when not a draft, without PUTting", async () => {
-    const current = { id: "sc-1", draft: false, date: "2026-07-01" };
+    const current = { id: "3001", draft: false, date: "2026-07-01" };
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -209,7 +209,7 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_supplier_credit",
-      arguments: { id: "sc-1", reference: "PO-123" },
+      arguments: { id: "3001", reference: "PO-123" },
     });
 
     expect(result.isError).toBe(true);
@@ -217,7 +217,7 @@ describe("supplier credit tools (list/apply)", () => {
   });
 
   it("update_supplier_credit rejects calculator_mode alone when not a draft, without an empty PATCH", async () => {
-    const current = { id: "sc-1", draft: false, date: "2026-07-01" };
+    const current = { id: "3001", draft: false, date: "2026-07-01" };
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -230,7 +230,7 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_supplier_credit",
-      arguments: { id: "sc-1", calculator_mode: "total" },
+      arguments: { id: "3001", calculator_mode: "total" },
     });
 
     expect(result.isError).toBe(true);
@@ -239,7 +239,7 @@ describe("supplier credit tools (list/apply)", () => {
   });
 
   it("update_supplier_credit sends items with description (not title) and expense_category, preserving id", async () => {
-    const current = { id: "sc-1", draft: true, date: "2026-07-01" };
+    const current = { id: "3001", draft: true, date: "2026-07-01" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -262,14 +262,14 @@ describe("supplier credit tools (list/apply)", () => {
     const result = await client.callTool({
       name: "update_supplier_credit",
       arguments: {
-        id: "sc-1",
+        id: "3001",
         items: [
           {
             id: "line-1",
             title: "Refund",
             quantity: "1",
             unit_value: "50.00",
-            expense_category: "cat-1",
+            expense_category: "7001",
           },
         ],
       },
@@ -284,14 +284,14 @@ describe("supplier credit tools (list/apply)", () => {
         description: "Refund",
         quantity: "1",
         unit_value: "50.00",
-        expense_category: "cat-1",
+        expense_category: "7001",
       },
     ]);
     expect(body.items[0].title).toBeUndefined();
   });
 
   it("update_supplier_credit persists calculator_mode on the draft-only PUT path", async () => {
-    const current = { id: "sc-1", draft: true, date: "2026-07-01", calculator_mode: "initial" };
+    const current = { id: "3001", draft: true, date: "2026-07-01", calculator_mode: "initial" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -313,7 +313,7 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "update_supplier_credit",
-      arguments: { id: "sc-1", calculator_mode: "total" },
+      arguments: { id: "3001", calculator_mode: "total" },
     });
 
     expect(result.isError).toBeFalsy();
@@ -325,7 +325,7 @@ describe("supplier credit tools (list/apply)", () => {
   });
 
   it("update_supplier_credit validates unit_total items against the document's current calculator_mode when the argument is omitted", async () => {
-    const current = { id: "sc-1", draft: true, date: "2026-07-01", calculator_mode: "total" };
+    const current = { id: "3001", draft: true, date: "2026-07-01", calculator_mode: "total" };
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -348,8 +348,8 @@ describe("supplier credit tools (list/apply)", () => {
     const result = await client.callTool({
       name: "update_supplier_credit",
       arguments: {
-        id: "sc-1",
-        items: [{ title: "Refund", quantity: "1", unit_total: "62.00", expense_category: "cat-1" }],
+        id: "3001",
+        items: [{ title: "Refund", quantity: "1", unit_total: "62.00", expense_category: "7001" }],
       },
     });
 
@@ -358,7 +358,7 @@ describe("supplier credit tools (list/apply)", () => {
     const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
     const body = JSON.parse(putOptions.body as string);
     expect(body.items).toEqual([
-      { description: "Refund", quantity: "1", unit_total: "62.00", expense_category: "cat-1" },
+      { description: "Refund", quantity: "1", unit_total: "62.00", expense_category: "7001" },
     ]);
     expect(body.calculator_mode).toBe("total");
   });
@@ -374,23 +374,23 @@ describe("supplier credit tools (list/apply)", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "delete_supplier_credit", arguments: { id: "sc-1" } });
+    const result = await client.callTool({ name: "delete_supplier_credit", arguments: { id: "3001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/");
     expect(options.method).toBe("DELETE");
   });
 
   it("void_supplier_credit PUTs {void: true} to the void sub-resource", async () => {
-    const mockFetch = mockFetchWith({ id: "sc-1", status: "void" });
+    const mockFetch = mockFetchWith({ id: "3001", status: "void" });
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "void_supplier_credit", arguments: { id: "sc-1" } });
+    const result = await client.callTool({ name: "void_supplier_credit", arguments: { id: "3001" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/void/");
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/void/");
     expect(options.method).toBe("PUT");
     expect(JSON.parse(options.body as string)).toEqual({ void: true });
   });
@@ -424,15 +424,15 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "send_supplier_credit_email",
-      arguments: { id: "sc-1" },
+      arguments: { id: "3001" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [getUrl] = mockFetch.mock.calls[0] as [string];
-    expect(getUrl).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/email/");
+    expect(getUrl).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/email/");
     const [postUrl, options] = mockFetch.mock.calls[1] as [string, RequestInit];
-    expect(postUrl).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/email/");
+    expect(postUrl).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/email/");
     expect(JSON.parse(options.body as string)).toEqual({
       to: "supplier@example.com",
       subject: "Default subject",
@@ -457,12 +457,12 @@ describe("supplier credit tools (list/apply)", () => {
 
     const result = await client.callTool({
       name: "export_supplier_credit_pdf",
-      arguments: { id: "sc-1" },
+      arguments: { id: "3001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/sc-1/pdf/");
+    expect(url).toBe("https://api.elorus.com/v1.2/suppliercredits/3001/pdf/");
     const content = result.content as Array<{ type: string; resource: { mimeType: string } }>;
     expect(content[0].resource.mimeType).toBe("application/pdf");
   });

@@ -97,8 +97,8 @@ describe("product tools", () => {
         title: "Consulting hours",
         sale_value: "80.00",
         purchase_value: "40.00",
-        sale_taxes: ["tax-1"],
-        purchase_taxes: ["tax-2"],
+        sale_taxes: ["1101"],
+        purchase_taxes: ["1102"],
         unit_measure: "hour",
       },
     });
@@ -108,8 +108,8 @@ describe("product tools", () => {
       title: "Consulting hours",
       sale_value: "80.00",
       purchase_value: "40.00",
-      sale_taxes: ["tax-1"],
-      purchase_taxes: ["tax-2"],
+      sale_taxes: ["1101"],
+      purchase_taxes: ["1102"],
       unit_measure: "hour",
       sales: true,
       purchases: true,
@@ -160,11 +160,11 @@ describe("product tools", () => {
     vi.stubGlobal("fetch", mockFetch);
     const client = await connectedClient(elorusClient);
 
-    const result = await client.callTool({ name: "delete_product", arguments: { id: "prod-1" } });
+    const result = await client.callTool({ name: "delete_product", arguments: { id: "2101" } });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/products/prod-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/products/2101/");
     expect(options.method).toBe("DELETE");
   });
 });

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { lineItemSchema, lineItemUpdateSchema } from "../schemas/line-item.js";
 import { splitEmailList } from "../email.js";
 
@@ -88,7 +89,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
     {
       description: "Fetch a single invoice by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus invoice ID"),
+        id: elorusId("The Elorus invoice ID"),
       },
     },
     async ({ id }) => {
@@ -198,7 +199,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         "PATCH. Updating items this way REPLACES THE ENTIRE LINE LIST: include every existing line's id " +
         "you want to keep, or that line is deleted.",
       inputSchema: {
-        id: z.string().describe("The Elorus invoice ID to update"),
+        id: elorusId("The Elorus invoice ID to update"),
         custom_id: z.string().optional().describe("Custom/external ID for this invoice (PATCH-safe, any status)"),
         draft: z
           .boolean()
@@ -361,7 +362,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         "void_invoice for issued invoices with financial history; this is intended for draft cleanup. " +
         "This is a hard delete with no undo.",
       inputSchema: {
-        id: z.string().describe("The Elorus invoice ID to delete"),
+        id: elorusId("The Elorus invoice ID to delete"),
       },
     },
     async ({ id }) => {
@@ -377,7 +378,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
     {
       description: "Void an invoice. A voided invoice cannot be edited or paid and is excluded from financial reports.",
       inputSchema: {
-        id: z.string().describe("The Elorus invoice ID to void"),
+        id: elorusId("The Elorus invoice ID to void"),
       },
     },
     async ({ id }) => {
@@ -395,7 +396,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
         "Email an invoice to the client. First fetches the organization's default recipient/subject/message " +
         "for this invoice, then overrides them with any fields you provide before sending.",
       inputSchema: {
-        id: z.string().describe("The Elorus invoice ID to send"),
+        id: elorusId("The Elorus invoice ID to send"),
         to: z
           .string()
           .email()
@@ -452,7 +453,7 @@ export function registerInvoiceTools(server: McpServer, client: ElorusClient): v
     {
       description: "Export an invoice as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
-        id: z.string().describe("The Elorus invoice ID to export"),
+        id: elorusId("The Elorus invoice ID to export"),
       },
     },
     async ({ id }) => {

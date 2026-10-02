@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 
 const sequenceName = z.string().min(1).max(10);
 const result = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
@@ -10,7 +11,7 @@ export function registerSequenceTools(server: McpServer, client: ElorusClient): 
   for (const documentType of [false, true]) {
     const name = documentType ? "document_type_sequence" : "goods_receipt_sequence";
     const parentFields: z.ZodRawShape = documentType
-      ? { document_type_id: z.string().min(1).describe("Document type ID") } : {};
+      ? { document_type_id: elorusId("Document type ID") } : {};
     const path = (id: unknown) => documentType ? `/documenttypes/${id}/sequences/` : "/goodsreceiptsequences/";
 
     server.registerTool(`list_${name}s`, {

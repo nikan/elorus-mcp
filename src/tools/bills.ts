@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { addAttachment } from "./attachments.js";
 import { splitEmailList } from "../email.js";
 import { billLineItemSchema } from "../schemas/bill-line-item.js";
@@ -65,7 +66,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
     {
       description: "Fetch a single supplier bill by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID"),
+        id: elorusId("The Elorus bill ID"),
       },
     },
     async ({ id }) => {
@@ -143,7 +144,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         "can only be set while the bill is in draft — the API rejects any field changes once " +
         "a bill is issued, except for draft/date, so revert to draft first if needed.",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID to update"),
+        id: elorusId("The Elorus bill ID to update"),
         date: z.string().optional().describe("Bill issue date in YYYY-MM-DD format"),
         reference: z
           .string()
@@ -187,7 +188,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         "client. By default the attachment is set as the primary receipt (the document shown in the " +
         "bill's receipt panel).",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID to attach the file to"),
+        id: elorusId("The Elorus bill ID to attach the file to"),
         file_path: z
           .string()
           .optional()
@@ -233,7 +234,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
     {
       description: "Void a supplier bill. A voided bill is excluded from financial reports and cannot be paid.",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID to void"),
+        id: elorusId("The Elorus bill ID to void"),
       },
     },
     async ({ id }) => {
@@ -252,7 +253,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         "void_bill for issued bills with financial history; this is intended for draft cleanup. This is " +
         "a hard delete with no undo.",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID to delete"),
+        id: elorusId("The Elorus bill ID to delete"),
       },
     },
     async ({ id }) => {
@@ -271,7 +272,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         "fetches the organization's default recipient/subject/message for this bill, then overrides them " +
         "with any fields you provide before sending.",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID to send"),
+        id: elorusId("The Elorus bill ID to send"),
         to: z
           .string()
           .email()
@@ -330,7 +331,7 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
         "Export a bill as a PDF. Applies to self-billed invoices (bills the organization issues to " +
         "itself). Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
-        id: z.string().describe("The Elorus bill ID to export"),
+        id: elorusId("The Elorus bill ID to export"),
       },
     },
     async ({ id }) => {

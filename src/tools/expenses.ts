@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { addAttachment } from "./attachments.js";
 import { expenseLineItemSchema } from "../schemas/expense-line-item.js";
 
@@ -60,7 +61,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description: "Fetch a single expense record by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus expense ID"),
+        id: elorusId("The Elorus expense ID"),
       },
     },
     async ({ id }) => {
@@ -126,9 +127,10 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description:
         "Update fields on an existing expense. Only provided fields are changed (PATCH semantics); " +
-        "the Elorus API only supports PUT on expenses, so this fetches the current record and merges your fields into it before saving.",
+        "the Elorus API only supports PUT on expenses, so this fetches the current record and merges your fields into it before saving. " +
+        "To change amounts, send a replacement `items` array — amounts cannot be changed any other way.",
       inputSchema: {
-        id: z.string().describe("The Elorus expense ID to update"),
+        id: elorusId("The Elorus expense ID to update"),
         date: z.string().optional().describe("Expense date in YYYY-MM-DD format"),
         supplier: z.string().optional().describe("Supplier contact ID"),
         expense_category: z
@@ -138,18 +140,41 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
             "Expense category ID (obtain from list_expense_categories). Applied to every line item on the expense."
           ),
         reference: z.string().optional().describe("Reference number or identifier for this expense"),
+        items: z
+          .array(expenseLineItemSchema)
+          .min(1)
+          .optional()
+          .describe(
+            "Replacement line items. The whole array is replaced, so send every line you want to keep — " +
+              "omitted lines are dropped. This is the only way to change an amount. Each item's amount is " +
+              "pre-tax or post-tax according to the expense's existing calculator_mode. Mutually exclusive " +
+              "with expense_category."
+          ),
       },
     },
-    async ({ id, expense_category, ...fields }) => {
+    async ({ id, expense_category, items, ...fields }) => {
+      if (items !== undefined && expense_category !== undefined) {
+        throw new Error(
+          "Pass either items or expense_category, not both — each item in items already carries its own expense_category."
+        );
+      }
       const overrides =
-        expense_category === undefined
-          ? fields
-          : (current: Record<string, unknown>) => ({
+        expense_category !== undefined
+          ? (current: Record<string, unknown>) => ({
               ...fields,
               items: (Array.isArray(current.items) ? current.items : []).map(
                 (item: Record<string, unknown>) => ({ ...item, expense_category })
               ),
-            });
+            })
+          : items === undefined
+            ? fields
+            : {
+                ...fields,
+                items: items.map(({ taxes, ...item }) => ({
+                  ...item,
+                  taxes: taxes?.map((tax) => ({ tax, auto_calculate: true })),
+                })),
+              };
       const result = await client.mergePut(`/expenses/${id}/`, overrides);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
@@ -165,7 +190,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
         "state — this is a hard delete with no undo, so confirm the ID is correct first (e.g. " +
         "via get_expense).",
       inputSchema: {
-        id: z.string().describe("The Elorus expense ID to delete"),
+        id: elorusId("The Elorus expense ID to delete"),
       },
     },
     async ({ id }) => {
@@ -189,7 +214,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
         "client. By default the attachment is set as the primary receipt (the document shown in the " +
         "expense's receipt panel).",
       inputSchema: {
-        id: z.string().describe("The Elorus expense ID to attach the file to"),
+        id: elorusId("The Elorus expense ID to attach the file to"),
         file_path: z
           .string()
           .optional()
@@ -241,7 +266,7 @@ export function registerExpenseTools(server: McpServer, client: ElorusClient): v
     {
       description: "Export an expense document as a PDF. Returns the PDF file content directly (base64-encoded).",
       inputSchema: {
-        id: z.string().describe("The Elorus expense ID to export"),
+        id: elorusId("The Elorus expense ID to export"),
       },
     },
     async ({ id }) => {

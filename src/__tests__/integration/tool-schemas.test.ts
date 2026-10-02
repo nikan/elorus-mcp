@@ -142,7 +142,7 @@ describe("create_expense request shape (through the real tool-call path)", () =>
       id: "3573038505774810569",
       date: "2026-07-15",
       supplier: "3572475991324362252",
-      items: [{ expense_category: "cat-1", amount: "1000.00", description: "Expense" }],
+      items: [{ expense_category: "7001", amount: "1000.00", description: "Expense" }],
     });
 
     const result = await client.callTool({
@@ -152,7 +152,7 @@ describe("create_expense request shape (through the real tool-call path)", () =>
         supplier: "3572475991324362252",
         currency_code: "GBP",
         calculator_mode: "initial",
-        items: [{ expense_category: "cat-1", amount: "1000.00", description: "Expense" }],
+        items: [{ expense_category: "7001", amount: "1000.00", description: "Expense" }],
       },
     });
 
@@ -164,7 +164,7 @@ describe("create_expense request shape (through the real tool-call path)", () =>
 
     const body = JSON.parse(options.body as string);
     expect(body.items).toEqual([
-      { expense_category: "cat-1", amount: "1000.00", description: "Expense" },
+      { expense_category: "7001", amount: "1000.00", description: "Expense" },
     ]);
     // Confirms the array survived SDK argument parsing as a real array, not a stringified blob —
     // the exact failure mode of the superRefine shape-introspection bug.
@@ -176,14 +176,14 @@ describe("create_expense request shape (through the real tool-call path)", () =>
     const mockFetch = mockPostCapture({
       id: "3573038505774810569",
       date: "2026-07-15",
-      items: [{ expense_category: "cat-1", amount: "100.00" }],
+      items: [{ expense_category: "7001", amount: "100.00" }],
     });
 
     const result = await client.callTool({
       name: "create_expense",
       arguments: {
         date: "2026-07-15",
-        items: [{ expense_category: "cat-1", amount: "100.00", taxes: ["tax-1"] }],
+        items: [{ expense_category: "7001", amount: "100.00", taxes: ["1101"] }],
       },
     });
 
@@ -193,9 +193,9 @@ describe("create_expense request shape (through the real tool-call path)", () =>
     const body = JSON.parse(options.body as string);
     expect(body.items).toEqual([
       {
-        expense_category: "cat-1",
+        expense_category: "7001",
         amount: "100.00",
-        taxes: [{ tax: "tax-1", auto_calculate: true }],
+        taxes: [{ tax: "1101", auto_calculate: true }],
       },
     ]);
   });
@@ -208,7 +208,7 @@ describe("create_expense request shape (through the real tool-call path)", () =>
       name: "create_expense",
       arguments: {
         date: "2026-07-15",
-        items: [{ expense_category: "cat-1", description: "no amount" }],
+        items: [{ expense_category: "7001", description: "no amount" }],
       },
     });
 
@@ -237,12 +237,12 @@ describe("delete_expense", () => {
 
     const result = await client.callTool({
       name: "delete_expense",
-      arguments: { id: "exp-1" },
+      arguments: { id: "6001" },
     });
 
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elorus.com/v1.2/expenses/exp-1/");
+    expect(url).toBe("https://api.elorus.com/v1.2/expenses/6001/");
     expect(options.method).toBe("DELETE");
   });
 });
@@ -263,31 +263,31 @@ describe("add_bill_attachment", () => {
         status: 201,
         statusText: "Created",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: false }),
+        json: () => Promise.resolve({ id: "5001", primary: false }),
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: true }),
+        json: () => Promise.resolve({ id: "5001", primary: true }),
       });
     vi.stubGlobal("fetch", mockFetch);
 
     const result = await client.callTool({
       name: "add_bill_attachment",
-      arguments: { id: "bill-1", filename: "bill.pdf", content_base64: "AAAA" },
+      arguments: { id: "2001", filename: "bill.pdf", content_base64: "AAAA" },
     });
 
     expect(result.isError).toBeFalsy();
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const [uploadUrl, uploadOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/bills/bill-1/attachments/");
+    expect(uploadUrl).toBe("https://api.elorus.com/v1.2/bills/2001/attachments/");
     expect(uploadOptions.method).toBe("POST");
 
     const [patchUrl, patchOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
-    expect(patchUrl).toBe("https://api.elorus.com/v1.2/bills/bill-1/attachments/att-1/");
+    expect(patchUrl).toBe("https://api.elorus.com/v1.2/bills/2001/attachments/5001/");
     expect(patchOptions.method).toBe("PATCH");
     expect(JSON.parse(patchOptions.body as string)).toEqual({ primary: true });
   });
@@ -299,13 +299,13 @@ describe("add_bill_attachment", () => {
       status: 201,
       statusText: "Created",
       headers: new Headers(),
-      json: () => Promise.resolve({ id: "att-1", primary: false }),
+      json: () => Promise.resolve({ id: "5001", primary: false }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const result = await client.callTool({
       name: "add_bill_attachment",
-      arguments: { id: "bill-1", filename: "bill.pdf", content_base64: "AAAA", primary: false },
+      arguments: { id: "2001", filename: "bill.pdf", content_base64: "AAAA", primary: false },
     });
 
     expect(result.isError).toBeFalsy();
@@ -321,14 +321,14 @@ describe("add_bill_attachment", () => {
         status: 201,
         statusText: "Created",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: false }),
+        json: () => Promise.resolve({ id: "5001", primary: false }),
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         statusText: "OK",
         headers: new Headers(),
-        json: () => Promise.resolve({ id: "att-1", primary: true }),
+        json: () => Promise.resolve({ id: "5001", primary: true }),
       });
     vi.stubGlobal("fetch", mockFetch);
 
@@ -339,7 +339,7 @@ describe("add_bill_attachment", () => {
     try {
       const result = await client.callTool({
         name: "add_bill_attachment",
-        arguments: { id: "bill-1", file_path: tmpFile },
+        arguments: { id: "2001", file_path: tmpFile },
       });
 
       expect(result.isError).toBeFalsy();
@@ -361,7 +361,7 @@ describe("add_bill_attachment", () => {
 
     const result = await client.callTool({
       name: "add_bill_attachment",
-      arguments: { id: "bill-1", filename: "bill.pdf" },
+      arguments: { id: "2001", filename: "bill.pdf" },
     });
 
     expect(result.isError).toBe(true);

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { lineItemSchema } from "../schemas/line-item.js";
 
 export function registerRecurringInvoiceTools(server: McpServer, client: ElorusClient): void {
@@ -75,7 +76,7 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
     {
       description: "Fetch a single recurring invoice schedule by its Elorus ID.",
       inputSchema: {
-        id: z.string().describe("The Elorus recurring invoice ID"),
+        id: elorusId("The Elorus recurring invoice ID"),
       },
     },
     async ({ id }) => {
@@ -203,7 +204,7 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
         "Update fields on an existing recurring invoice schedule. Only provided fields are changed (PATCH semantics); " +
         "the Elorus API only supports PUT on recurring invoices, so this fetches the current record and merges your fields into it before saving.",
       inputSchema: {
-        id: z.string().describe("The Elorus recurring invoice ID to update"),
+        id: elorusId("The Elorus recurring invoice ID to update"),
         client: z.string().optional().describe("Contact ID of the client being invoiced"),
         items: z
           .array(lineItemSchema)
@@ -281,7 +282,7 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
     {
       description: "Pause a recurring invoice schedule. While paused, no new invoices are generated until resumed.",
       inputSchema: {
-        id: z.string().describe("The Elorus recurring invoice ID to pause"),
+        id: elorusId("The Elorus recurring invoice ID to pause"),
       },
     },
     async ({ id }) => {
@@ -297,7 +298,7 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
     {
       description: "Resume a paused recurring invoice schedule so it starts generating invoices again.",
       inputSchema: {
-        id: z.string().describe("The Elorus recurring invoice ID to resume"),
+        id: elorusId("The Elorus recurring invoice ID to resume"),
       },
     },
     async ({ id }) => {
@@ -315,7 +316,7 @@ export function registerRecurringInvoiceTools(server: McpServer, client: ElorusC
         "Permanently delete a recurring invoice schedule. This only removes the template — invoices " +
         "it has already generated are unaffected. This is a hard delete with no undo.",
       inputSchema: {
-        id: z.string().describe("The Elorus recurring invoice ID to delete"),
+        id: elorusId("The Elorus recurring invoice ID to delete"),
       },
     },
     async ({ id }) => {

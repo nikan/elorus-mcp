@@ -69,6 +69,17 @@ const READ_ONLY_RESPONSE_FIELDS = new Set([
   "next_execution",
 ]);
 
+/**
+ * Rejects paths that could resolve to a different endpoint than the caller intended. `new URL()`
+ * collapses dot segments, so an interpolated "../contacts/5" would silently retarget the request.
+ * Tool schemas already restrict IDs to digits; this is the backstop for every other source.
+ */
+function assertSafePath(path: string): void {
+  if (!path.startsWith("/") || /[?#\\%\s]/.test(path) || path.split("/").some((segment) => segment === "." || segment === "..")) {
+    throw new Error(`Invalid Elorus API path: ${JSON.stringify(path)}`);
+  }
+}
+
 export class ElorusClient {
   private readonly baseUrl = "https://api.elorus.com/v1.2";
   private readonly headers: Record<string, string>;
@@ -85,6 +96,11 @@ export class ElorusClient {
     }
   }
 
+  private url(path: string): URL {
+    assertSafePath(path);
+    return new URL(`${this.baseUrl}${path}`);
+  }
+
   /** Wraps fetch with the request deadline and a clear timeout error message. */
   private async fetchWithTimeout(url: string, init: RequestInit, path: string): Promise<Response> {
     try {
@@ -98,7 +114,7 @@ export class ElorusClient {
   }
 
   async get<T>(path: string, params?: QueryParams): Promise<T> {
-    const url = new URL(`${this.baseUrl}${path}`);
+    const url = this.url(path);
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         if (value !== undefined) {
@@ -116,7 +132,7 @@ export class ElorusClient {
 
   async post<T>(path: string, body: unknown): Promise<T> {
     const response = await this.fetchWithTimeout(
-      `${this.baseUrl}${path}`,
+      this.url(path).toString(),
       { method: "POST", headers: this.headers, body: JSON.stringify(body) },
       path
     );
@@ -132,7 +148,7 @@ export class ElorusClient {
     const headers = { ...this.headers };
     delete headers["Content-Type"];
     const response = await this.fetchWithTimeout(
-      `${this.baseUrl}${path}`,
+      this.url(path).toString(),
       { method: "POST", headers, body: form },
       path
     );
@@ -141,7 +157,7 @@ export class ElorusClient {
 
   async patch<T>(path: string, body: unknown): Promise<T> {
     const response = await this.fetchWithTimeout(
-      `${this.baseUrl}${path}`,
+      this.url(path).toString(),
       { method: "PATCH", headers: this.headers, body: JSON.stringify(body) },
       path
     );
@@ -150,7 +166,7 @@ export class ElorusClient {
 
   async put<T>(path: string, body: unknown): Promise<T> {
     const response = await this.fetchWithTimeout(
-      `${this.baseUrl}${path}`,
+      this.url(path).toString(),
       { method: "PUT", headers: this.headers, body: JSON.stringify(body) },
       path
     );
@@ -172,7 +188,7 @@ export class ElorusClient {
       ...this.headers,
       Accept: expectedContentType ? `application/${expectedContentType}` : "*/*",
     };
-    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, { headers }, path);
+    const response = await this.fetchWithTimeout(this.url(path).toString(), { headers }, path);
     if (!response.ok) {
       let details = response.statusText;
       try {
@@ -208,7 +224,7 @@ export class ElorusClient {
 
   async delete<T>(path: string, body?: unknown): Promise<T> {
     const response = await this.fetchWithTimeout(
-      `${this.baseUrl}${path}`,
+      this.url(path).toString(),
       { method: "DELETE", headers: this.headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) },
       path
     );

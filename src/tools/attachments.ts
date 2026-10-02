@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ElorusClient } from "../client.js";
+import { elorusId } from "../schemas/id.js";
 import { readAttachmentFile } from "../attachments.js";
 
 /** Maps a public resource_type value to its plural path segment under /v1.2/. All of these pluralize with a trailing 's'. */
@@ -76,7 +77,7 @@ export function registerAttachmentTools(server: McpServer, client: ElorusClient)
       description: "List files attached to an Elorus resource (bill, contact, invoice, etc.).",
       inputSchema: {
         resource_type: attachmentResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource to list attachments for"),
+        resource_id: elorusId("The ID of the resource to list attachments for"),
       },
     },
     async ({ resource_type, resource_id }) => {
@@ -93,8 +94,8 @@ export function registerAttachmentTools(server: McpServer, client: ElorusClient)
       description: "Fetch metadata for a single attachment (title, filename, primary flag) by its ID.",
       inputSchema: {
         resource_type: attachmentResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource the attachment is attached to"),
-        attachment_id: z.string().describe("The ID of the attachment to fetch"),
+        resource_id: elorusId("The ID of the resource the attachment is attached to"),
+        attachment_id: elorusId("The ID of the attachment to fetch"),
       },
     },
     async ({ resource_type, resource_id, attachment_id }) => {
@@ -117,7 +118,7 @@ export function registerAttachmentTools(server: McpServer, client: ElorusClient)
         "the resource's primary receipt/document.",
       inputSchema: {
         resource_type: attachmentResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource to attach the file to"),
+        resource_id: elorusId("The ID of the resource to attach the file to"),
         file_path: z
           .string()
           .optional()
@@ -164,8 +165,8 @@ export function registerAttachmentTools(server: McpServer, client: ElorusClient)
       description: "Update an attachment's title or which attachment is the resource's primary document.",
       inputSchema: {
         resource_type: attachmentResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource the attachment is attached to"),
-        attachment_id: z.string().describe("The ID of the attachment to update"),
+        resource_id: elorusId("The ID of the resource the attachment is attached to"),
+        attachment_id: elorusId("The ID of the attachment to update"),
         title: z.string().optional().describe("New internal title for the attachment"),
         primary: z
           .boolean()
@@ -193,8 +194,8 @@ export function registerAttachmentTools(server: McpServer, client: ElorusClient)
       description: "Permanently delete an attachment. This is a hard delete with no undo.",
       inputSchema: {
         resource_type: attachmentResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource the attachment is attached to"),
-        attachment_id: z.string().describe("The ID of the attachment to delete"),
+        resource_id: elorusId("The ID of the resource the attachment is attached to"),
+        attachment_id: elorusId("The ID of the attachment to delete"),
       },
     },
     async ({ resource_type, resource_id, attachment_id }) => {
@@ -215,8 +216,8 @@ export function registerAttachmentTools(server: McpServer, client: ElorusClient)
         "content type varies by file (PDF, image, document, etc.), unlike the PDF-only export tools.",
       inputSchema: {
         resource_type: attachmentResourceTypeSchema,
-        resource_id: z.string().describe("The ID of the resource the attachment is attached to"),
-        attachment_id: z.string().describe("The ID of the attachment to download"),
+        resource_id: elorusId("The ID of the resource the attachment is attached to"),
+        attachment_id: elorusId("The ID of the attachment to download"),
       },
     },
     async ({ resource_type, resource_id, attachment_id }) => {
