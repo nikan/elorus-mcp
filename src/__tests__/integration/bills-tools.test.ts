@@ -237,6 +237,37 @@ describe("bill tools (list/get/void/update)", () => {
     ]);
   });
 
+  it("update_bill maps taxes to {tax, auto_calculate} objects and discount to unit_discount_percentage/mode", async () => {
+    const mockFetch = mockGetThenPut({ id: "2001", calculator_mode: "initial", items: [] });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_bill",
+      arguments: {
+        id: "2001",
+        items: [
+          {
+            id: "55",
+            title: "Hosting",
+            quantity: "1",
+            unit_value: "60.00",
+            expense_category: "7001",
+            taxes: ["456"],
+            discount: "10.00",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const [item] = JSON.parse(putOptions.body as string).items;
+    expect(item.taxes).toEqual([{ tax: "456", auto_calculate: true }]);
+    expect(item.unit_discount_percentage).toBe("10.00");
+    expect(item.unit_discount_mode).toBe("percentage");
+    expect(item).not.toHaveProperty("discount");
+  });
+
   it("update_bill with expense_category rewrites the category on every existing line", async () => {
     const mockFetch = mockGetThenPut({
       id: "2001",

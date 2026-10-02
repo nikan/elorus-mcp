@@ -192,7 +192,15 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           items !== undefined
             ? {
                 ...base,
-                items: items.map(({ title, ...item }) => ({ ...item, description: title })),
+                items: items.map(({ title, taxes, discount, ...item }) => ({
+                  ...item,
+                  description: title,
+                  taxes: taxes?.map((tax) => ({ tax, auto_calculate: true })),
+                  ...(discount !== undefined && {
+                    unit_discount_percentage: discount,
+                    unit_discount_mode: "percentage",
+                  }),
+                })),
               }
             : (current: Record<string, unknown>) => ({
                 ...base,
