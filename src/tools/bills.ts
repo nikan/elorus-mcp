@@ -4,7 +4,7 @@ import { ElorusClient } from "../client.js";
 import { elorusId } from "../schemas/id.js";
 import { addAttachment } from "./attachments.js";
 import { splitEmailList } from "../email.js";
-import { billLineItemSchema } from "../schemas/bill-line-item.js";
+import { billLineItemSchema, billLineItemUpdateSchema } from "../schemas/bill-line-item.js";
 
 export function registerBillTools(server: McpServer, client: ElorusClient): void {
   server.registerTool(
@@ -140,12 +140,31 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
     "update_bill",
     {
       description:
-        "Update fields on an existing bill. Only provided fields are changed. Note: reference " +
-        "can only be set while the bill is in draft — the API rejects any field changes once " +
-        "a bill is issued, except for draft/date, so revert to draft first if needed.",
+        "Update fields on an existing bill. Only provided fields are changed. Note: reference, " +
+        "items and expense_category can only be set while the bill is in draft — the API rejects " +
+        "any field changes once a bill is issued, except for draft/date, so revert to draft first " +
+        "if needed. Items/expense_category/reference go through a GET-merge-PUT; to change amounts, " +
+        "send a replacement `items` array.",
       inputSchema: {
         id: elorusId("The Elorus bill ID to update"),
         date: z.string().optional().describe("Bill issue date in YYYY-MM-DD format"),
+        expense_category: z
+          .string()
+          .optional()
+          .describe(
+            "Expense category ID (obtain from list_expense_categories). Applied to every line item on the bill. " +
+              "Mutually exclusive with items."
+          ),
+        items: z
+          .array(billLineItemUpdateSchema)
+          .min(1)
+          .optional()
+          .describe(
+            "Replacement line items. The whole array is replaced, so send every line you want to keep — " +
+              "omitted lines are dropped. Include each existing line's `id` to edit it in place instead of " +
+              "recreating it. Each item's price (unit_value or unit_total) must match the bill's existing " +
+              "calculator_mode. Mutually exclusive with expense_category."
+          ),
         reference: z
           .string()
           .optional()
@@ -161,7 +180,39 @@ export function registerBillTools(server: McpServer, client: ElorusClient): void
           ),
       },
     },
-    async ({ id, reference, ...fields }) => {
+    async ({ id, reference, expense_category, items, ...fields }) => {
+      if (items !== undefined && expense_category !== undefined) {
+        throw new Error(
+          "Pass either items or expense_category, not both — each item in items already carries its own expense_category."
+        );
+      }
+      if (items !== undefined || expense_category !== undefined) {
+        const base = reference !== undefined ? { ...fields, reference } : fields;
+        const overrides =
+          items !== undefined
+            ? {
+                ...base,
+                items: items.map(({ title, taxes, discount, ...item }) => ({
+                  ...item,
+                  description: title,
+                  taxes: taxes?.map((tax) => ({ tax, auto_calculate: true })),
+                  ...(discount !== undefined && {
+                    unit_discount_percentage: discount,
+                    unit_discount_mode: "percentage",
+                  }),
+                })),
+              }
+            : (current: Record<string, unknown>) => ({
+                ...base,
+                items: (Array.isArray(current.items) ? current.items : []).map(
+                  (item: Record<string, unknown>) => ({ ...item, expense_category })
+                ),
+              });
+        const result = await client.mergePut(`/bills/${id}/`, overrides);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      }
       if (reference !== undefined) {
         const result = await client.mergePut(`/bills/${id}/`, { ...fields, reference });
         return {

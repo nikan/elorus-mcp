@@ -198,6 +198,117 @@ describe("bill tools (list/get/void/update)", () => {
     expect(JSON.parse(putOptions.body as string)).toMatchObject({ reference: "PO-123" });
   });
 
+  function mockGetThenPut(current: unknown) {
+    const res = (body: unknown) => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: new Headers(),
+      json: () => Promise.resolve(body),
+    });
+    const mockFetch = vi.fn().mockResolvedValueOnce(res(current)).mockResolvedValueOnce(res(current));
+    vi.stubGlobal("fetch", mockFetch);
+    return mockFetch;
+  }
+
+  it("update_bill with items PUTs the merged record, keeping line ids and remapping title to description", async () => {
+    const mockFetch = mockGetThenPut({ id: "2001", date: "2026-07-01", calculator_mode: "initial", items: [] });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_bill",
+      arguments: {
+        id: "2001",
+        items: [
+          { id: "55", title: "Hosting", quantity: "1", unit_value: "60.00", expense_category: "7001" },
+          { title: "Domain", quantity: "1", unit_value: "12.00", expense_category: "7001" },
+        ],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(putOptions.method).toBe("PUT");
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.calculator_mode).toBe("initial");
+    expect(body.items).toEqual([
+      { id: "55", description: "Hosting", quantity: "1", unit_value: "60.00", expense_category: "7001" },
+      { description: "Domain", quantity: "1", unit_value: "12.00", expense_category: "7001" },
+    ]);
+  });
+
+  it("update_bill maps taxes to {tax, auto_calculate} objects and discount to unit_discount_percentage/mode", async () => {
+    const mockFetch = mockGetThenPut({ id: "2001", calculator_mode: "initial", items: [] });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_bill",
+      arguments: {
+        id: "2001",
+        items: [
+          {
+            id: "55",
+            title: "Hosting",
+            quantity: "1",
+            unit_value: "60.00",
+            expense_category: "7001",
+            taxes: ["456"],
+            discount: "10.00",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const [item] = JSON.parse(putOptions.body as string).items;
+    expect(item.taxes).toEqual([{ tax: "456", auto_calculate: true }]);
+    expect(item.unit_discount_percentage).toBe("10.00");
+    expect(item.unit_discount_mode).toBe("percentage");
+    expect(item).not.toHaveProperty("discount");
+  });
+
+  it("update_bill with expense_category rewrites the category on every existing line", async () => {
+    const mockFetch = mockGetThenPut({
+      id: "2001",
+      items: [
+        { id: "55", description: "A", quantity: "1", unit_value: "10.00", expense_category: "1" },
+        { id: "56", description: "B", quantity: "2", unit_value: "5.00", expense_category: "2" },
+      ],
+    });
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_bill",
+      arguments: { id: "2001", expense_category: "9" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [, putOptions] = mockFetch.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(putOptions.body as string);
+    expect(body.items.map((i: { id: string; expense_category: string }) => [i.id, i.expense_category])).toEqual([
+      ["55", "9"],
+      ["56", "9"],
+    ]);
+  });
+
+  it("update_bill rejects items together with expense_category without reaching the API", async () => {
+    const mockFetch = mockFetchWith({});
+    const client = await connectedClient(elorusClient);
+
+    const result = await client.callTool({
+      name: "update_bill",
+      arguments: {
+        id: "2001",
+        expense_category: "9",
+        items: [{ title: "A", quantity: "1", unit_value: "1.00", expense_category: "9" }],
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("delete_bill DELETEs /bills/{id}/", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
