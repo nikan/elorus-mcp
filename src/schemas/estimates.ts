@@ -74,11 +74,14 @@ const estimateCreateSchema = z.object({
   items: z.array(estimateItemCreateSchema).describe("Full line list. On update include every existing line id to retain it; omitted lines are deleted."),
   taxes: z.array(estimateStandardTaxNestedSchema).optional().describe("taxes"),
   template: z.string().regex(/^\d+$/).optional().describe("Template"),
-  terms: z.string().optional().describe("Terms & conditions"),
+  terms: z.string().optional().describe("Terms & conditions. Can only be set here: Elorus ignores terms on update and never returns them on read."),
   public_notes: z.string().optional().describe("Public notes"),
 });
 
 export const createFields = estimateCreateSchema.shape;
+
+/** Fields Elorus accepts on create only: a PUT silently ignores them, so update_estimate rejects them. */
+export const createOnlyFields = ["terms"] as const;
 
 const estimateItemUpdateSchema = z.object({
   id: z.string().min(1).optional().describe("Id"),

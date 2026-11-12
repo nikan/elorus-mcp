@@ -61,6 +61,27 @@ describe("estimate calculator_mode total_pre_discount", () => {
     expect(body.calculator_mode).toBe("total_pre_discount");
     expect(body.public_notes).toBe("Revised");
   });
+  it("sends terms on create", async () => {
+    const result = await client.callTool({
+      name: "create_estimate",
+      arguments: { client: "123", terms: "Payment: 50/50", items: [{ title: "S", quantity: "1", unit_value: "10.00" }] },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).terms).toBe("Payment: 50/50");
+  });
+
+  it("rejects terms on update instead of reporting a PUT that the API ignores", async () => {
+    const result = await client.callTool({
+      name: "update_estimate",
+      arguments: { id: "100", terms: "Payment: 50/50", public_notes: "Revised" },
+    });
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ text: string }>)[0].text;
+    expect(text).toContain("terms cannot be updated");
+    expect(text).toContain("create_estimate");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("validates gross pricing for total_pre_discount instead of requiring unit_value", async () => {
     const item = { title: "Service", quantity: "1", unit_value_gross: "12.40", unit_total: "12.40" };
     const created = await client.callTool({

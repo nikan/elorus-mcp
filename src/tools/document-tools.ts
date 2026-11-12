@@ -22,12 +22,22 @@ export function registerDocumentTools(
     listFields: z.ZodRawShape;
     voidable: boolean;
     contactField: "client" | "contact" | "supplier";
+    /** Create fields the API ignores on update; update rejects them instead of dropping them silently. */
+    createOnlyFields?: readonly string[];
   }
 ): void {
   const { singular, plural, path, createFields, updateFields, patchFields, listFields } = config;
   const label = singular.replaceAll("_", " ");
   const idSchema = { id: elorusId(`Elorus ${label} ID`) };
   const optionalUpdateFields = z.object(updateFields).partial().shape;
+  const createOnlyFields = config.createOnlyFields ?? [];
+  const createOnlyNote = createOnlyFields.length === 0 ? "" :
+    ` ${createOnlyFields.join(", ")} can only be set by create_${singular}: Elorus ignores it on update, so to change it create a new ${label} and delete the old draft.`;
+  // Listed in the update schema so a caller learns the limitation; otherwise the SDK's schema
+  // parsing would strip the field and report a successful update that changed nothing.
+  const createOnlyUpdateFields = Object.fromEntries(createOnlyFields.map((field) => [
+    field, z.unknown().optional().describe(`Not updatable: Elorus accepts ${field} only on create. Passing it fails.`),
+  ]));
 
   server.registerTool(`list_${plural}`, {
     description: `List and filter ${plural.replaceAll("_", " ")}. Date period bounds must be provided together.`,
@@ -52,9 +62,13 @@ export function registerDocumentTools(
   });
 
   server.registerTool(`update_${singular}`, {
-    description: `Update a ${label}. ${Object.keys(patchFields).join(", ")} use PATCH at any status. Other fields require an existing draft and a full PUT. Items replace the entire line list: include every existing line id to retain it.`,
-    inputSchema: { ...optionalUpdateFields, ...patchFields, ...idSchema },
+    description: `Update a ${label}. ${Object.keys(patchFields).join(", ")} use PATCH at any status. Other fields require an existing draft and a full PUT. Items replace the entire line list: include every existing line id to retain it.${createOnlyNote}`,
+    inputSchema: { ...optionalUpdateFields, ...patchFields, ...createOnlyUpdateFields, ...idSchema },
   }, async ({ id, ...fields }: Record<string, unknown>) => {
+    const rejected = createOnlyFields.filter((field) => fields[field] !== undefined);
+    if (rejected.length > 0) {
+      throw new Error(`${rejected.join(", ")} cannot be updated: Elorus accepts ${rejected.join(", ")} only when the ${label} is created and ignores it on update. Create a new ${label} with create_${singular} and delete the old draft.`);
+    }
     if (Object.keys(fields).length === 0) throw new Error("Provide at least one field to update");
     if (Object.keys(fields).every((key) => key in patchFields)) {
       return textResult(await client.patch(`${path}${id}/`, fields));
