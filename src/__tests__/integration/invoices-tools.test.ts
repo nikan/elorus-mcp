@@ -218,7 +218,8 @@ describe("invoice tools (handler-level)", () => {
     expect(result.isError).toBeFalsy();
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.elorus.com/v1.2/invoices/1001/pdf/");
-    expect((options.headers as Record<string, string>).Accept).toBe("application/pdf");
+    // A bare "application/pdf" gets 406 Not Acceptable from the live API; the wildcard is required.
+    expect((options.headers as Record<string, string>).Accept).toBe("application/pdf, */*");
     const content = result.content as Array<{ type: string; resource: { mimeType: string; blob: string } }>;
     expect(content[0].type).toBe("resource");
     expect(content[0].resource.mimeType).toBe("application/pdf");

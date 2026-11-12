@@ -177,16 +177,18 @@ export class ElorusClient {
    * For endpoints (e.g. PDF exports, attachment downloads) that return a binary body instead
    * of JSON. `handleResponse` always calls `response.json()`, so this bypasses it entirely.
    *
-   * `expectedContentType` is a substring to require in the response's Content-Type (also sent
-   * as the Accept header, prefixed with "application/"), defaulting to "pdf" to match every
-   * existing caller. Pass `null` for endpoints whose content type isn't known ahead of time
-   * (e.g. attachment downloads, which can be images/docs/etc.) — this sends a wildcard Accept
-   * header and skips the Content-Type check, trusting whatever the server returns.
+   * `expectedContentType` is a substring to require in the response's Content-Type, defaulting
+   * to "pdf" to match every existing caller. It is also sent as the preferred Accept type
+   * ("application/<type>"), followed by a wildcard: the live API answers a bare
+   * `Accept: application/pdf` with 406 Not Acceptable on every document's /pdf/ endpoint, even
+   * though the body it serves is a PDF. Pass `null` for endpoints whose content type isn't known
+   * ahead of time (e.g. attachment downloads, which can be images/docs/etc.) — this sends only
+   * the wildcard and skips the Content-Type check, trusting whatever the server returns.
    */
   async getBinary(path: string, expectedContentType: string | null = "pdf"): Promise<BinaryResponse> {
     const headers = {
       ...this.headers,
-      Accept: expectedContentType ? `application/${expectedContentType}` : "*/*",
+      Accept: expectedContentType ? `application/${expectedContentType}, */*` : "*/*",
     };
     const response = await this.fetchWithTimeout(this.url(path).toString(), { headers }, path);
     if (!response.ok) {
